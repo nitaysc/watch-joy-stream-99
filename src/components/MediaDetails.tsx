@@ -23,7 +23,10 @@ interface CineProResponse {
   sources: Source[];
 }
 
-const CINEPRO_BASE = "http://localhost:3000";
+// Set VITE_CINEPRO_URL in your Lovable project settings (Settings → Environment Variables)
+// or create a .env file locally with: VITE_CINEPRO_URL=http://192.168.x.x:3000
+// Default: localhost works on PC browser, but NOT from phone
+const CINEPRO_BASE = import.meta.env.VITE_CINEPRO_URL ?? "http://localhost:3000";
 
 function toUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
   if (mediaType === "tv") {
