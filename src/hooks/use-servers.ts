@@ -5,7 +5,7 @@ export type Server = {
   url: string;
 };
 
-export function useServerPing(servers: Server[], prioritizeSuperEmbed: boolean = false) {
+export function useServerPing(servers: Server[], prioritizeVidKing: boolean = false) {
   const [pings, setPings] = useState<Record<string, number | null>>({});
   const [checking, setChecking] = useState(true);
   const [bestIndex, setBestIndex] = useState(0);
@@ -38,8 +38,8 @@ export function useServerPing(servers: Server[], prioritizeSuperEmbed: boolean =
       setPings(results);
       setChecking(false);
 
-      if (prioritizeSuperEmbed && results["SuperEmbed"] !== null) {
-        setBestIndex(servers.findIndex(s => s.name === "SuperEmbed"));
+      if (prioritizeVidKing && results["VidKing"] !== null) {
+        setBestIndex(servers.findIndex(s => s.name === "VidKing"));
         return;
       }
 
@@ -57,7 +57,7 @@ export function useServerPing(servers: Server[], prioritizeSuperEmbed: boolean =
       if (minPing !== Infinity) {
         setBestIndex(bestIdx);
       } else {
-        setBestIndex(prioritizeSuperEmbed ? servers.findIndex(s => s.name === "SuperEmbed") : 0);
+        setBestIndex(prioritizeVidKing ? servers.findIndex(s => s.name === "VidKing") : 0);
       }
     };
 

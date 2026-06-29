@@ -32,7 +32,10 @@ function MoviePage() {
   const servers = [
     { name: "VidKing", url: `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true` },
     { name: "VidSrc", url: `https://vidsrc.xyz/embed/movie/${id}` },
+    { name: "VidSrc Pro", url: `https://vidsrc.pro/embed/movie/${id}` },
     { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1` },
+    { name: "AutoEmbed", url: `https://player.autoembed.cc/embed/movie/${id}` },
+    { name: "SmashyStream", url: `https://player.smashy.stream/movie/${id}` },
   ];
   
   const { pings, checking, bestIndex, setBestIndex } = useServerPing(servers);

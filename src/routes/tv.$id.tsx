@@ -45,7 +45,10 @@ function TvPage() {
   const servers = [
     { name: "VidKing", url: `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true` },
     { name: "VidSrc", url: `https://vidsrc.xyz/embed/tv/${tvId}/${season}/${episode}` },
+    { name: "VidSrc Pro", url: `https://vidsrc.pro/embed/tv/${tvId}/${season}/${episode}` },
     { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${tvId}&tmdb=1&s=${season}&e=${episode}` },
+    { name: "AutoEmbed", url: `https://player.autoembed.cc/embed/tv/${tvId}/${season}/${episode}` },
+    { name: "SmashyStream", url: `https://player.smashy.stream/tv?tmdb=${tvId}&s=${season}&e=${episode}` },
   ];
   
   const { pings, checking, bestIndex, setBestIndex } = useServerPing(servers, tvId === 37854);
