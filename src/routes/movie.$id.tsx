@@ -26,7 +26,7 @@ function MoviePage() {
   const { id } = Route.useParams();
   const { t, i18n } = useTranslation();
   const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
-  const src = `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true`;
+  const src = `https://vidcore.org/embed/movie/${id}?color=e85c5c&autoPlay=true`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
