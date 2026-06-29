@@ -82,6 +82,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   const fetchId = useRef(0);
 
   const applySources = (sorted: Source[]) => {
+    // Icefy is most reliable
+    const icefyIdx = sorted.findIndex((s) => s.provider?.name === "Icefy");
+    if (icefyIdx > 0) {
+      const [source] = sorted.splice(icefyIdx, 1);
+      sorted.unshift(source);
+    }
     const mapped: ServerSource[] = sorted.map((s) => ({
       url: s.url,
       type: s.type,
