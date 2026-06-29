@@ -21,60 +21,87 @@ function randomDelay(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/** Safely extract text from a CSS selector; returns null if selector matches nothing. */
-function safeText($: cheerio.CheerioAPI, selector: string): string | null {
-  try {
-    const el = $(selector);
-    return el.length > 0 ? el.first().text().trim() || null : null;
-  } catch {
-    return null;
-  }
-}
-
-/** Safely extract an attribute from a CSS selector. */
-function safeAttr(
-  $: cheerio.CheerioAPI,
-  selector: string,
-  attr: string,
-): string | null {
-  try {
-    const el = $(selector);
-    return el.length > 0 ? el.first().attr(attr)?.trim() ?? null : null;
-  } catch {
-    return null;
-  }
-}
-
-// ─── Selector Profiles ──────────────────────────────────────────────────────
-// Each supported site needs a profile that maps CSS selectors to fields.
-
-type SelectorProfile = {
-  title: string;
-  year: string;
-  rating: string;
-  posterUrl: { selector: string; attr: string };
-  genre: string;
-};
-
-const PROFILES: Record<string, SelectorProfile> = {
-  "imdb.com": {
-    title: 'h1[data-testid="hero__pageTitle"]',
-    year: 'ul[data-testid="hero-title-block__metadata"] li:first-child a',
-    rating:
-      'div[data-testid="hero-rating-bar__aggregate-rating__score"] span:first-child',
-    posterUrl: {
-      selector: 'img.ipc-image',
-      attr: "src",
-    },
-    genre: 'div[data-testid="genres"] span.ipc-chip__text',
-  },
-};
-
-function getProfile(url: string): { domain: string; profile: SelectorProfile } | null {
-  for (const [domain, profile] of Object.entries(PROFILES)) {
-    if (url.includes(domain)) return { domain, profile };
+/**
+ * Extract JSON-LD structured data from a page.
+ * Most major sites (IMDb, Rotten Tomatoes, etc.) embed machine-readable
+ * metadata in <script type="application/ld+json"> tags. This is far more
+ * reliable than CSS selectors because it survives JS-rendered pages.
+ */
+function extractJsonLd($: cheerio.CheerioAPI): any | null {
+  const scripts = $('script[type="application/ld+json"]');
+  for (let i = 0; i < scripts.length; i++) {
+    try {
+      const raw = $(scripts[i]).html();
+      if (!raw) continue;
+      const parsed = JSON.parse(raw);
+      // Look for Movie or TVSeries schema types
+      if (
+        parsed["@type"] === "Movie" ||
+        parsed["@type"] === "TVSeries" ||
+        parsed["@type"] === "TVEpisode"
+      ) {
+        return parsed;
+      }
+    } catch {
+      // Malformed JSON — skip
+    }
   }
   return null;
+}
+
+/** Parse a JSON-LD object into our standardized ScrapedMovie shape. */
+function parseJsonLd(ld: any, sourceUrl: string): ScrapedMovie {
+  // Title
+  const title: string | null = ld.name ?? ld.headline ?? null;
+
+  // Year — from datePublished or dateCreated
+  let year: number | null = null;
+  const dateStr = ld.datePublished ?? ld.dateCreated ?? null;
+  if (dateStr) {
+    const match = String(dateStr).match(/(\d{4})/);
+    if (match) year = parseInt(match[1], 10);
+  }
+
+  // Rating — from aggregateRating
+  let rating: string | null = null;
+  if (ld.aggregateRating) {
+    const val = ld.aggregateRating.ratingValue;
+    if (val != null) rating = String(val);
+  }
+
+  // Poster — from image (can be string or object)
+  let posterUrl: string | null = null;
+  if (typeof ld.image === "string") {
+    posterUrl = ld.image;
+  } else if (ld.image?.url) {
+    posterUrl = ld.image.url;
+  }
+
+  // Genres — string or array
+  let genre: string[] = [];
+  if (Array.isArray(ld.genre)) {
+    genre = ld.genre.map(String);
+  } else if (typeof ld.genre === "string") {
+    genre = ld.genre.split(",").map((g: string) => g.trim()).filter(Boolean);
+  }
+
+  return {
+    title,
+    year,
+    rating,
+    posterUrl,
+    genre,
+    sourceUrl,
+    scrapedAt: new Date().toISOString(),
+  };
+}
+
+// ─── Supported domains ──────────────────────────────────────────────────────
+
+const SUPPORTED_DOMAINS = ["imdb.com", "rottentomatoes.com"];
+
+function isSupportedUrl(url: string): boolean {
+  return SUPPORTED_DOMAINS.some((d) => url.includes(d));
 }
 
 // ─── Server Functions ────────────────────────────────────────────────────────
@@ -88,17 +115,16 @@ export const scrapeMovieData = createServerFn({ method: "POST" })
     try {
       new URL(url);
     } catch {
-      throw new Error("Invalid URL. Please provide a full URL starting with https://");
-    }
-
-    // Match a selector profile
-    const match = getProfile(url);
-    if (!match) {
       throw new Error(
-        `No selector profile for this site. Supported: ${Object.keys(PROFILES).join(", ")}`,
+        "Invalid URL. Please provide a full URL starting with https://",
       );
     }
-    const { profile } = match;
+
+    if (!isSupportedUrl(url)) {
+      throw new Error(
+        `Unsupported site. Currently supports: ${SUPPORTED_DOMAINS.join(", ")}`,
+      );
+    }
 
     // Ethical delay
     await randomDelay();
@@ -109,7 +135,8 @@ export const scrapeMovieData = createServerFn({ method: "POST" })
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
         "Accept-Language": "en-US,en;q=0.9",
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        Accept:
+          "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
       },
     });
 
@@ -120,37 +147,42 @@ export const scrapeMovieData = createServerFn({ method: "POST" })
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // Extract fields using the profile, with safe fallbacks
-    const title = safeText($, profile.title);
+    // Strategy: extract JSON-LD first (most reliable), fall back to meta tags
+    const ld = extractJsonLd($);
 
-    const yearText = safeText($, profile.year);
-    const year = yearText
-      ? parseInt(yearText.replace(/\D/g, "").slice(0, 4), 10) || null
-      : null;
+    if (ld) {
+      return parseJsonLd(ld, url);
+    }
 
-    const rating = safeText($, profile.rating);
+    // Fallback: parse Open Graph / standard meta tags
+    const title =
+      $('meta[property="og:title"]').attr("content")?.trim() ??
+      $("title").text().trim() ??
+      null;
 
-    const posterUrl = safeAttr($, profile.posterUrl.selector, profile.posterUrl.attr);
+    let year: number | null = null;
+    const ogDesc =
+      $('meta[property="og:description"]').attr("content") ?? "";
+    const yearMatch = ogDesc.match(/\b(19|20)\d{2}\b/);
+    if (yearMatch) year = parseInt(yearMatch[0], 10);
 
-    const genres: string[] = [];
-    $(profile.genre).each((_, el) => {
-      const text = $(el).text().trim();
-      if (text && !genres.includes(text)) genres.push(text);
-    });
+    const posterUrl =
+      $('meta[property="og:image"]').attr("content")?.trim() ?? null;
 
     return {
-      title,
+      title: title || null,
       year,
-      rating,
+      rating: null,
       posterUrl,
-      genre: genres,
+      genre: [],
       sourceUrl: url,
       scrapedAt: new Date().toISOString(),
     };
   });
 
 /** Returns the list of supported site domains. */
-export const getSupportedSites = createServerFn({ method: "GET" })
-  .handler(async () => {
-    return { sites: Object.keys(PROFILES) };
-  });
+export const getSupportedSites = createServerFn({ method: "GET" }).handler(
+  async () => {
+    return { sites: SUPPORTED_DOMAINS };
+  },
+);

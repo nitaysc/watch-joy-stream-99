@@ -52,6 +52,7 @@ function ScraperPage() {
     { label: "The Shawshank Redemption", url: "https://www.imdb.com/title/tt0111161/" },
     { label: "Inception", url: "https://www.imdb.com/title/tt1375666/" },
     { label: "Breaking Bad", url: "https://www.imdb.com/title/tt0903747/" },
+    { label: "The Dark Knight (RT)", url: "https://www.rottentomatoes.com/m/the_dark_knight" },
   ];
 
   return (
@@ -64,9 +65,9 @@ function ScraperPage() {
         </div>
         <h1 className="text-3xl font-bold sm:text-4xl">Web Scraper</h1>
         <p className="mt-2 text-muted-foreground max-w-xl">
-          Enter a URL to extract movie or TV series metadata. The scraper parses
-          the page HTML server-side using Cheerio, with a built-in 2–5s ethical
-          delay between requests.
+          Enter a URL to extract movie or TV series metadata. Uses JSON-LD
+          structured data extraction server-side, with a built-in 2–5s ethical
+          delay. Supports: <strong>IMDb</strong>, <strong>Rotten Tomatoes</strong>.
         </p>
       </div>
 
