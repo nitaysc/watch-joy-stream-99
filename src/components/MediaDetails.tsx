@@ -126,7 +126,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       .then((data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        const sorted = [...data.sources].sort(sortSources);
+        let sorted = [...data.sources].sort(sortSources);
         // Remove VidApi sources if any better provider exists
         if (sorted.some((s) => sourcePriority(s) > 0)) {
           const filtered = sorted.filter((s) => !SLOW_PROVIDERS.has(s.provider?.name ?? ""));
