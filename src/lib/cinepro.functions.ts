@@ -29,18 +29,8 @@ function extractDirectInfo(proxyUrl: string): { directUrl: string; headers: Reco
 }
 
 // Override source URL to always use CinePro proxy (relative paths in HLS playlists require it)
-function ensureProxyUrl(sourceUrl: string, cineproBase: string): string {
-  const direct = extractDirectInfo(sourceUrl);
-  // If it already looks like a proxy URL, rewrite localhost to the CinePro base
-  if (sourceUrl.includes("/v1/proxy")) {
-    return sourceUrl.replace(/http:\/\/localhost:\d+/, cineproBase);
-  }
-  // If it's a direct URL (extracted), re-wrap it through the proxy
-  if (direct) {
-    const encoded = encodeURIComponent(JSON.stringify({ url: direct.directUrl, headers: direct.headers }));
-    return `${cineproBase}/v1/proxy?data=${encoded}`;
-  }
-  return sourceUrl;
+function toProxyUrl(sourceUrl: string, cineproBase: string): string {
+  return sourceUrl.replace(/http:\/\/localhost:\d+/, cineproBase);
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
@@ -114,8 +104,29 @@ export const getStreams = createServerFn({ method: "GET" })
     if (json.sources) {
       json.sources = json.sources.map((s) => ({
         ...s,
-        url: ensureProxyUrl(s.url, CINEPRO_BASE),
+        url: toProxyUrl(s.url, CINEPRO_BASE),
       }));
+
+      // Validate each source by fetching its master playlist through the proxy
+      const validated = await Promise.allSettled(
+        json.sources.map(async (s) => {
+          const res = await fetch(s.url, { signal: AbortSignal.timeout(10000) });
+          if (!res.ok) throw new Error(`status ${res.status}`);
+          const text = await res.text();
+          if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("<title>Forbidden")) {
+            throw new Error("source returned error page");
+          }
+          return s;
+        })
+      );
+
+      json.sources = validated
+        .filter((r) => r.status === "fulfilled")
+        .map((r) => (r as PromiseFulfilledResult<Source>).value);
+
+      if (json.sources.length === 0) {
+        throw new Error("All source providers returned broken streams");
+      }
     }
 
     try {
