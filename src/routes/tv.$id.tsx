@@ -48,7 +48,6 @@ function TvPage() {
             src={src}
             className="h-full w-full"
             allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-            sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-popups allow-popups-to-escape-sandbox allow-orientation-lock allow-pointer-lock"
             referrerPolicy="no-referrer"
             allowFullScreen
           />
