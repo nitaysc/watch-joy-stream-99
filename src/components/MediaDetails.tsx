@@ -50,9 +50,30 @@ function setCache(key: string, data: Source[], expiresAt: string) {
   } catch { /* quota exceeded */ }
 }
 
-function qualityRank(q: string): number {
-  const n = parseInt(q, 10);
-  return isNaN(n) ? 0 : n;
+// Known slow providers to deprioritize
+const SLOW_PROVIDERS = new Set(["VidAPI", "Vidcloud", "Gogo", "VidSrc"]);
+
+const SLOW_QUALITY_PENALTY = 100000; // massive penalty so slow providers always sort last
+
+function providerRank(name: string | undefined): number {
+  if (!name) return 0;
+  // Known-fast providers get highest priority
+  if (name === "UpCloud") return 3;
+  if (name === "MixDrop") return 2;
+  if (name === "Filemoon") return 2;
+  // Slow providers get pushed to bottom
+  if (SLOW_PROVIDERS.has(name)) return -1;
+  return 0;
+}
+
+function sortSources(a: Source, b: Source): number {
+  const pa = providerRank(a.provider?.name);
+  const pb = providerRank(b.provider?.name);
+  if (pa !== pb) return pb - pa; // known-fast first
+  // Within same tier, higher quality first
+  const qa = parseInt(a.quality, 10);
+  const qb = parseInt(b.quality, 10);
+  return (isNaN(qb) ? 0 : qb) - (isNaN(qa) ? 0 : qa);
 }
 
 export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
@@ -97,7 +118,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       .then((data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        const sorted = [...data.sources].sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
+        const sorted = [...data.sources].sort(sortSources);
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
       })

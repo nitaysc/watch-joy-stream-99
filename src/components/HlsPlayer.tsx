@@ -286,6 +286,20 @@ export default function HlsPlayer({
     }
   }, [src, type]);
 
+  // Playback timeout: if source doesn't start playing within 8s, try next
+  const playTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  useEffect(() => {
+    if (loading && !error) {
+      clearTimeout(playTimeoutRef.current);
+      playTimeoutRef.current = setTimeout(() => {
+        if (!playing && !error) onError?.();
+      }, 8000);
+    } else {
+      clearTimeout(playTimeoutRef.current);
+    }
+    return () => clearTimeout(playTimeoutRef.current);
+  }, [loading, playing, error, src]);
+
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
