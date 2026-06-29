@@ -1,222 +1,56 @@
-﻿/* modern-player.css — Premium Video.js skin */
+﻿/* modern-player.css — Custom overlay skin for Video.js
+   Default controls are hidden; all UI is rendered by HlsPlayer.tsx overlay */
 
 .vjs-modern-theme.video-js {
-  font-family: 'Inter', 'Roboto', sans-serif;
+  font-family: inherit;
   color: #fff;
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
-/* Big Play Button */
-.vjs-modern-theme .vjs-big-play-button {
-  width: 80px;
-  height: 80px;
-  line-height: 80px;
-  border-radius: 50%;
-  border: none;
-  background: linear-gradient(135deg, rgba(232, 92, 92, 0.9), rgba(200, 50, 50, 0.8));
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 32px rgba(200, 50, 50, 0.4);
+/* Hide ALL default Video.js controls — we use our custom overlay */
+.vjs-modern-theme .vjs-control-bar,
+.vjs-modern-theme .vjs-big-play-button,
+.vjs-modern-theme .vjs-loading-spinner,
+.vjs-modern-theme .vjs-poster,
+.vjs-modern-theme .vjs-text-track-display,
+.vjs-modern-theme .vjs-modal-dialog,
+.vjs-modern-theme .vjs-error-display,
+.vjs-modern-theme .vjs-control,
+.vjs-modern-theme .vjs-button {
+  display: none !important;
 }
 
-.vjs-modern-theme:hover .vjs-big-play-button {
-  background: linear-gradient(135deg, rgba(232, 92, 92, 1), rgba(200, 50, 50, 1));
-  transform: translate(-50%, -50%) scale(1.12);
-  box-shadow: 0 12px 40px rgba(232, 92, 92, 0.5);
+/* Keep poster visible until video starts, then fade it */
+.vjs-modern-theme .vjs-poster {
+  display: block !important;
+  background-size: cover;
 }
 
-.vjs-modern-theme .vjs-big-play-button .vjs-icon-placeholder:before {
-  font-size: 42px;
-  line-height: 80px;
-}
-
-/* Control Bar */
-.vjs-modern-theme .vjs-control-bar {
-  background: rgba(10, 10, 15, 0.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 20px;
-  margin: 12px 12px;
-  width: calc(100% - 24px);
-  height: 54px;
-  display: flex;
-  align-items: center;
-  padding: 0 10px;
-  bottom: 0;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-
-.vjs-modern-theme.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-control-bar {
-  opacity: 0;
-  transform: translateY(14px);
-}
-
-.vjs-modern-theme.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-big-play-button {
-  opacity: 0;
-  transform: translate(-50%, -50%) scale(0.8);
-}
-
-/* Timeline / Progress Control */
-.vjs-modern-theme .vjs-progress-control {
-  position: absolute;
-  top: -14px;
-  left: 0;
-  right: 0;
-  width: 100%;
-  height: 14px;
-  cursor: pointer;
-  display: flex;
-  align-items: flex-end;
-}
-
-.vjs-modern-theme .vjs-progress-holder {
-  height: 3px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.15);
-  margin: 0;
-  transition: height 0.2s ease;
-}
-
-.vjs-modern-theme .vjs-progress-control:hover .vjs-progress-holder {
-  height: 6px;
-}
-
-.vjs-modern-theme .vjs-play-progress {
-  background: linear-gradient(90deg, #e85c5c, #ff7a5c);
-  border-radius: 2px;
-}
-
-.vjs-modern-theme .vjs-play-progress:before {
-  display: none;
-}
-
-.vjs-modern-theme .vjs-play-progress::after {
-  content: '';
-  position: absolute;
-  right: -6px;
-  top: 50%;
-  transform: translateY(-50%) scale(0);
-  width: 14px;
-  height: 14px;
-  background: #fff;
-  border-radius: 50%;
-  box-shadow: 0 0 8px rgba(232, 92, 92, 0.5);
-  transition: transform 0.2s ease;
-}
-
-.vjs-modern-theme .vjs-progress-control:hover .vjs-play-progress::after {
-  transform: translateY(-50%) scale(1);
-}
-
-.vjs-modern-theme .vjs-load-progress {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 2px;
-}
-
-/* Controls spacing & styling */
-.vjs-modern-theme .vjs-button > .vjs-icon-placeholder:before {
-  line-height: 54px;
-  font-size: 20px;
-  transition: text-shadow 0.2s, transform 0.2s;
-}
-
-.vjs-modern-theme .vjs-button:hover > .vjs-icon-placeholder:before {
-  text-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
-  transform: scale(1.1);
-}
-
-/* Time tooltips and display */
-.vjs-modern-theme .vjs-time-control {
-  line-height: 54px;
-  font-size: 13px;
-  font-weight: 500;
-  padding: 0 8px;
-}
-
-.vjs-modern-theme .vjs-current-time,
-.vjs-modern-theme .vjs-duration {
-  display: block;
-}
-
-.vjs-modern-theme .vjs-time-divider {
-  display: block;
-  line-height: 54px;
-  padding: 0;
-  min-width: unset;
-  opacity: 0.5;
-}
-
-/* Menus */
-.vjs-modern-theme .vjs-menu-button-popup .vjs-menu {
-  margin-bottom: 24px;
-}
-
-.vjs-modern-theme .vjs-menu-content {
-  background: rgba(15, 15, 20, 0.92) !important;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-radius: 12px;
-  padding: 8px !important;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
-}
-
-.vjs-modern-theme .vjs-menu-item {
-  border-radius: 6px;
-  margin-bottom: 2px;
-  text-transform: capitalize;
-  transition: background 0.2s;
-  font-size: 13px;
-}
-
-.vjs-modern-theme .vjs-menu-item:hover,
-.vjs-modern-theme .vjs-menu-item:focus {
-  background: rgba(232, 92, 92, 0.35) !important;
-  color: #fff !important;
-}
-
-.vjs-modern-theme .vjs-menu-item.vjs-selected {
-  background: rgba(232, 92, 92, 0.7) !important;
-  font-weight: bold;
-}
-
-/* Volume panel */
-.vjs-modern-theme .vjs-volume-panel {
-  display: flex;
-  align-items: center;
-  transition: width 0.3s;
-}
-
-.vjs-modern-theme .vjs-volume-bar.vjs-slider-horizontal {
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.vjs-modern-theme .vjs-volume-level {
-  background: linear-gradient(90deg, #e85c5c, #ff7a5c);
-  border-radius: 2px;
-}
-
-.vjs-modern-theme .vjs-volume-level:before {
-  display: none;
-}
-
-/* Play/pause button specific */
-.vjs-modern-theme .vjs-play-control {
-  order: -1;
-}
-
-/* Poster image subtle zoom */
 .vjs-modern-theme.vjs-has-started .vjs-poster {
   opacity: 0;
   transition: opacity 0.5s ease;
+}
+
+/* Hide the "No compatible source" text */
+.vjs-modern-theme .vjs-error .vjs-error-display .vjs-modal-dialog-content {
+  display: none;
+}
+
+/* Tech loader */
+.vjs-modern-theme.vjs-waiting .vjs-loading-spinner {
+  display: none !important;
+}
+
+/* Smooth poster fade when video starts */
+.vjs-modern-theme video {
+  object-fit: contain;
+  background: transparent;
+}
+
+/* Subtle fullscreen adjustments */
+.vjs-modern-theme.video-js:-webkit-full-screen {
+  border-radius: 0;
+}
+
+.vjs-modern-theme.video-js:fullscreen {
+  border-radius: 0;
 }

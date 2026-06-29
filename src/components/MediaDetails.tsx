@@ -147,7 +147,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
               type={streamType}
               poster={poster}
               autoplay
-              controls
               width="100%"
               height="100%"
             />
