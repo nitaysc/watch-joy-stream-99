@@ -24,6 +24,7 @@ interface HlsPlayerProps {
   sources?: ServerSource[];
   activeSourceIdx?: number;
   onSourceChange?: (idx: number) => void;
+  onError?: () => void;
 }
 
 function formatTime(s: number) {
@@ -44,7 +45,7 @@ function volumeIcon(vol: number, muted: boolean) {
 
 export default function HlsPlayer({
   src, type = "application/x-mpegURL", poster, autoplay = false,
-  sources = [], activeSourceIdx = 0, onSourceChange
+  sources = [], activeSourceIdx = 0, onSourceChange, onError
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
@@ -241,7 +242,11 @@ export default function HlsPlayer({
     player.on("waiting", () => setLoading(true));
     player.on("canplay", () => { setLoading(false); updateTracks(); refreshQualityLevels(); });
     player.on("playing", () => setLoading(false));
-    player.on("error", () => setError(true));
+    player.on("error", () => {
+      setError(true);
+      setLoading(false);
+      onError?.();
+    });
     player.on("loadedmetadata", () => { setDuration(player.duration() ?? 0); updateTracks(); refreshQualityLevels(); });
     player.on("timeupdate", () => {
       setCurrentTime(player.currentTime() ?? 0);

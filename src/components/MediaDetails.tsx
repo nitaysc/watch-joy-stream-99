@@ -118,6 +118,13 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
     setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
   };
 
+  // Auto-retry: cycle to next source on playback error
+  const handlePlaybackError = () => {
+    if (sources.length <= 1) return;
+    const nextIdx = (activeIdx + 1) % sources.length;
+    handleSourceChange(nextIdx);
+  };
+
   return (
     <div className="mx-auto w-full max-w-5xl">
       {/* Error */}
@@ -148,6 +155,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
               sources={sources}
               activeSourceIdx={activeIdx}
               onSourceChange={handleSourceChange}
+              onError={handlePlaybackError}
             />
           </div>
         ) : (

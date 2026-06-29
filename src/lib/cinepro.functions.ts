@@ -21,6 +21,26 @@ function fixSourceUrl(url: string, base: string): string {
   return url;
 }
 
+async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: { "Accept": "application/json" },
+      signal: controller.signal,
+    });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function buildUrl(base: string, mediaType: string, id: string | number, season?: string, episode?: string): string {
+  return mediaType === "tv"
+    ? `${base}/v1/tv/${id}/seasons/${season ?? "1"}/episodes/${episode ?? "1"}`
+    : `${base}/v1/movies/${id}`;
+}
+
 export const getStreams = createServerFn({ method: "GET" })
   .inputValidator((d: {
     id: string | number;
@@ -30,12 +50,9 @@ export const getStreams = createServerFn({ method: "GET" })
   }) => d)
   .handler(async ({ data }) => {
     const CINEPRO_BASE = process.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
+    const url = buildUrl(CINEPRO_BASE, data.mediaType, data.id, data.season, data.episode);
 
-    const url = data.mediaType === "tv"
-      ? `${CINEPRO_BASE}/v1/tv/${data.id}/seasons/${data.season ?? "1"}/episodes/${data.episode ?? "1"}`
-      : `${CINEPRO_BASE}/v1/movies/${data.id}`;
-
-    // Cloudflare Cache API
+    // Cloudflare Cache API — instant return if cached
     try {
       const cache = caches.default as any;
       const cacheKey = new Request(url);
@@ -44,21 +61,38 @@ export const getStreams = createServerFn({ method: "GET" })
         const json: CineProResponse = await cached.json();
         return json;
       }
-    } catch { /* cache not available (dev) */ }
+    } catch { /* dev mode */ }
 
-    const res = await fetch(url, {
-      headers: { "Accept": "application/json" },
-      signal: AbortSignal.timeout(30000),
-    });
+    // Try the main endpoint with a fast timeout, retry once in parallel
+    let json: CineProResponse | null = null;
+    const attempts = [fetchWithTimeout(url, 12000)];
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "");
-      throw new Error(`CinePro returned ${res.status}${text ? `: ${text.slice(0, 100)}` : ""}`);
+    // Second parallel attempt hits the same URL (some providers return faster on retry)
+    if (process.env.NODE_ENV !== "development") {
+      attempts.push(fetchWithTimeout(url, 14000));
     }
 
-    const json: CineProResponse = await res.json();
+    const results = await Promise.allSettled(attempts);
+    for (const result of results) {
+      if (result.status === "fulfilled" && result.value.ok) {
+        try {
+          json = await result.value.json();
+          if (json?.sources?.length) break;
+        } catch { /* try next */ }
+      }
+    }
 
-    // Fix proxy URLs server-side
+    if (!json || !json.sources?.length) {
+      // Final single attempt with full timeout
+      const res = await fetchWithTimeout(url, 20000);
+      if (!res.ok) {
+        const text = await res.text().catch(() => "");
+        throw new Error(`CinePro returned ${res.status}${text ? `: ${text.slice(0, 100)}` : ""}`);
+      }
+      json = await res.json();
+    }
+
+    // Fix proxy URLs
     if (json.sources) {
       json.sources = json.sources.map((s) => ({
         ...s,
