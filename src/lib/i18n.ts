@@ -1,0 +1,135 @@
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+
+const resources = {
+  en: {
+    translation: {
+      "Search movies & TV...": "Search movies & TV...",
+      "Cinely": "Cinely",
+      "Trending Movies": "Trending Movies",
+      "Trending TV Shows": "Trending TV Shows",
+      "Top Rated Movies": "Top Rated Movies",
+      "Top Rated TV": "Top Rated TV",
+      "Page not found.": "Page not found.",
+      "Go home": "Go home",
+      "Something went wrong": "Something went wrong",
+      "Try again": "Try again",
+      "Home": "Home",
+      "Release Date": "Release Date",
+      "Rating": "Rating",
+      "Overview": "Overview",
+      "Cast": "Cast",
+      "Similar Movies": "Similar Movies",
+      "Similar TV Shows": "Similar TV Shows",
+      "Seasons": "Seasons",
+      "No results found.": "No results found.",
+      "Results for": "Results for",
+      "Search": "Search",
+      "Trending This Week": "Trending This Week",
+      "Popular Movies": "Popular Movies",
+      "Popular TV Series": "Popular TV Series",
+      "Top Rated TV Series": "Top Rated TV Series",
+      "Trending Movie": "Trending Movie",
+      "Trending Series": "Trending Series",
+      "Watch Now": "Watch Now",
+      "Details": "Details",
+      "min": "min",
+      "Now playing": "Now playing",
+      "S": "S",
+      "E": "E",
+      "Episodes": "Episodes",
+      "Loading episodes...": "Loading episodes..."
+    }
+  },
+  he: {
+    translation: {
+      "Search movies & TV...": "חיפוש סרטים וסדרות...",
+      "Cinely": "סינלי",
+      "Trending Movies": "סרטים פופולריים",
+      "Trending TV Shows": "סדרות פופולריות",
+      "Top Rated Movies": "סרטים מומלצים",
+      "Top Rated TV": "סדרות מומלצות",
+      "Page not found.": "העמוד לא נמצא.",
+      "Go home": "חזור לדף הבית",
+      "Something went wrong": "משהו השתבש",
+      "Try again": "נסה שוב",
+      "Home": "דף הבית",
+      "Release Date": "תאריך יציאה",
+      "Rating": "דירוג",
+      "Overview": "תקציר",
+      "Cast": "שחקנים",
+      "Similar Movies": "סרטים דומים",
+      "Similar TV Shows": "סדרות דומות",
+      "Seasons": "עונות",
+      "No results found.": "לא נמצאו תוצאות.",
+      "Results for": "תוצאות עבור",
+      "Search": "חיפוש",
+      "Trending This Week": "פופולרי השבוע",
+      "Popular Movies": "סרטים פופולריים",
+      "Popular TV Series": "סדרות פופולריות",
+      "Top Rated TV Series": "סדרות מומלצות",
+      "Trending Movie": "סרט פופולרי",
+      "Trending Series": "סדרה פופולרית",
+      "Watch Now": "צפה עכשיו",
+      "Details": "פרטים",
+      "min": "דק'",
+      "Now playing": "מתנגן עכשיו",
+      "S": "עונה ",
+      "E": "פרק ",
+      "Episodes": "פרקים",
+      "Loading episodes...": "טוען פרקים..."
+    }
+  },
+  ru: {
+    translation: {
+      "Search movies & TV...": "Поиск фильмов и сериалов...",
+      "Cinely": "Cinely",
+      "Trending Movies": "Популярные фильмы",
+      "Trending TV Shows": "Популярные сериалы",
+      "Top Rated Movies": "Лучшие фильмы",
+      "Top Rated TV": "Лучшие сериалы",
+      "Page not found.": "Страница не найдена.",
+      "Go home": "На главную",
+      "Something went wrong": "Что-то пошло не так",
+      "Try again": "Попробовать снова",
+      "Home": "Главная",
+      "Release Date": "Дата выхода",
+      "Rating": "Рейтинг",
+      "Overview": "Описание",
+      "Cast": "В ролях",
+      "Similar Movies": "Похожие фильмы",
+      "Similar TV Shows": "Похожие сериалы",
+      "Seasons": "Сезоны",
+      "No results found.": "Ничего не найдено.",
+      "Results for": "Результаты для",
+      "Search": "Поиск",
+      "Trending This Week": "Популярное на этой неделе",
+      "Popular Movies": "Популярные фильмы",
+      "Popular TV Series": "Популярные сериалы",
+      "Top Rated TV Series": "Лучшие сериалы",
+      "Trending Movie": "Популярный фильм",
+      "Trending Series": "Популярный сериал",
+      "Watch Now": "Смотреть",
+      "Details": "Детали",
+      "min": "мин",
+      "Now playing": "Сейчас играет",
+      "S": "С",
+      "E": "Э",
+      "Episodes": "Эпизоды",
+      "Loading episodes...": "Загрузка эпизодов..."
+    }
+  }
+};
+
+i18n
+  .use(initReactI18next)
+  .init({
+    resources,
+    lng: "he", // default language
+    fallbackLng: "en",
+    interpolation: {
+      escapeValue: false // react already safes from xss
+    }
+  });
+
+export default i18n;

@@ -11,14 +11,17 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Header } from "@/components/Header";
+import { I18nextProvider, useTranslation } from "react-i18next";
+import i18n from "../lib/i18n";
 
 function NotFoundComponent() {
+  const { t } = useTranslation();
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
         <h1 className="text-7xl font-bold">404</h1>
-        <p className="mt-2 text-sm text-muted-foreground">Page not found.</p>
-        <a href="/" className="mt-6 inline-block rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">Go home</a>
+        <p className="mt-2 text-sm text-muted-foreground">{t("Page not found.")}</p>
+        <a href="/" className="mt-6 inline-block rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">{t("Go home")}</a>
       </div>
     </div>
   );
@@ -26,22 +29,23 @@ function NotFoundComponent() {
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   const router = useRouter();
+  const { t } = useTranslation();
   useEffect(() => {
     reportLovableError(error, { boundary: "tanstack_root_error_component" });
   }, [error]);
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
       <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold">Something went wrong</h1>
+        <h1 className="text-xl font-semibold">{t("Something went wrong")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error.message}</p>
         <div className="mt-6 flex justify-center gap-2">
           <button
             onClick={() => { router.invalidate(); reset(); }}
             className="rounded-full bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
-            Try again
+            {t("Try again")}
           </button>
-          <a href="/" className="rounded-full border border-border px-4 py-2 text-sm">Home</a>
+          <a href="/" className="rounded-full border border-border px-4 py-2 text-sm">{t("Home")}</a>
         </div>
       </div>
     </div>
@@ -73,8 +77,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const { i18n } = useTranslation();
+  const isRtl = i18n.language === "he";
   return (
-    <html lang="en">
+    <html lang={i18n.language} dir={isRtl ? "rtl" : "ltr"}>
       <head><HeadContent /></head>
       <body>{children}<Scripts /></body>
     </html>
@@ -84,11 +90,13 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   return (
-    <QueryClientProvider client={queryClient}>
-      <div className="min-h-screen">
-        <Header />
-        <Outlet />
-      </div>
-    </QueryClientProvider>
+    <I18nextProvider i18n={i18n}>
+      <QueryClientProvider client={queryClient}>
+        <div className="min-h-screen">
+          <Header />
+          <Outlet />
+        </div>
+      </QueryClientProvider>
+    </I18nextProvider>
   );
 }

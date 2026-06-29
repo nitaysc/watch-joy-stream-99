@@ -3,6 +3,7 @@ import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query"
 import { useState } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
 import { Star, Calendar, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const tvQuery = (id: number) =>
   queryOptions({ queryKey: ["tv", id], queryFn: () => getTv({ data: { id } }) });
@@ -34,6 +35,7 @@ function TvPage() {
   const firstSeason = m.seasons[0]?.season_number ?? 1;
   const [season, setSeason] = useState<number>(firstSeason);
   const [episode, setEpisode] = useState<number>(1);
+  const { t } = useTranslation();
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season));
 
@@ -67,12 +69,12 @@ function TvPage() {
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
-        <span className="text-sm text-muted-foreground">Now playing: S{season} · E{episode}</span>
+        <span className="text-sm text-muted-foreground">{t("Now playing")}: {t("S")}{season} · {t("E")}{episode}</span>
       </div>
 
       <section className="mt-6">
-        <h2 className="mb-3 text-lg font-semibold">Episodes</h2>
-        {epLoading && <p className="text-sm text-muted-foreground">Loading episodes…</p>}
+        <h2 className="mb-3 text-lg font-semibold">{t("Episodes")}</h2>
+        {epLoading && <p className="text-sm text-muted-foreground">{t("Loading episodes...")}</p>}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {seasonData?.episodes.map((ep) => {
             const active = ep.episode_number === episode;
@@ -87,7 +89,7 @@ function TvPage() {
                 <div className="relative aspect-video bg-muted">
                   {ep.still && <img src={ep.still} alt={ep.name} className="h-full w-full object-cover" />}
                   <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-xs font-semibold backdrop-blur">
-                    E{ep.episode_number}
+                    {t("E")}{ep.episode_number}
                   </span>
                 </div>
                 <div className="p-3">

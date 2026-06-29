@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getMovie } from "@/lib/tmdb.functions";
 import { Star, Clock, Calendar } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 const movieQuery = (id: number) =>
   queryOptions({ queryKey: ["movie", id], queryFn: () => getMovie({ data: { id } }) });
@@ -23,6 +24,7 @@ export const Route = createFileRoute("/movie/$id")({
 function MoviePage() {
   const { id } = Route.useParams();
   const { data: m } = useSuspenseQuery(movieQuery(Number(id)));
+  const { t } = useTranslation();
   const src = `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true`;
 
   return (
@@ -51,7 +53,7 @@ function MoviePage() {
               <span className="flex items-center gap-1"><Star className="h-4 w-4 fill-primary text-primary" />{m.rating.toFixed(1)}</span>
             )}
             {m.runtime && (
-              <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{m.runtime} min</span>
+              <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{m.runtime} {t("min")}</span>
             )}
             {m.date && (
               <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{m.date.slice(0, 4)}</span>

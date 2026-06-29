@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodValidator } from "@tanstack/zod-adapter";
 import { searchMedia } from "@/lib/tmdb.functions";
 import { MediaCard } from "@/components/MediaCard";
+import { useTranslation } from "react-i18next";
 
 const searchSchema = z.object({ q: z.string().optional().default("") });
 
@@ -30,14 +31,15 @@ export const Route = createFileRoute("/search")({
 function SearchPage() {
   const { q } = Route.useSearch();
   const { data } = useSuspenseQuery({ ...buildQuery(q), initialData: q ? undefined : { results: [] } });
+  const { t } = useTranslation();
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10">
       <h1 className="mb-6 text-2xl font-bold">
-        {q ? <>Results for <span className="text-primary">"{q}"</span></> : "Search"}
+        {q ? <>{t("Results for")} <span className="text-primary">"{q}"</span></> : t("Search")}
       </h1>
       {q && data.results.length === 0 && (
-        <p className="text-muted-foreground">No results found.</p>
+        <p className="text-muted-foreground">{t("No results found.")}</p>
       )}
       <div className="grid grid-cols-2 gap-x-4 gap-y-6 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
         {data.results.map((it) => (
