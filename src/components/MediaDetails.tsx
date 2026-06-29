@@ -161,26 +161,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         </div>
       )}
 
-      {/* Provider indicator */}
-      {sources.length > 0 && (
-        <div className="mb-2 flex items-center gap-3 text-xs text-white/40">
-          <span>Available: {sources.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => handleSourceChange(i)}
-              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-medium transition-all ${
-                i === activeIdx
-                  ? "bg-primary text-white shadow-sm shadow-primary/30"
-                  : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
-              }`}
-            >
-              {s.provider?.name ?? "Server"}
-              {s.quality && <span className="text-[10px] opacity-60">{s.quality}</span>}
-            </button>
-          ))}</span>
-        </div>
-      )}
-
       {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
