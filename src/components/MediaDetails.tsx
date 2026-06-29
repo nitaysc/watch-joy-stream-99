@@ -50,7 +50,7 @@ function setCache(key: string, data: Source[], expiresAt: string) {
   } catch { /* quota exceeded */ }
 }
 
-// Provider priority: fastest/most reliable first
+// Provider priority (higher = preferred)
 const PROVIDER_PRIORITY: Record<string, number> = {
   VixSrc: 5,
   VidRock: 4,
@@ -59,26 +59,14 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   MixDrop: 2,
   Filemoon: 2,
 };
-// Providers NOT in the map get priority 0
-// Known slow providers get negative priority
-const SLOW_PROVIDERS = new Set(["VidApi", "Vidcloud", "Gogo", "VidSrc"]);
-
-function sourcePriority(s: Source): number {
-  const name = s.provider?.name ?? "";
-  if (PROVIDER_PRIORITY[name] !== undefined) return PROVIDER_PRIORITY[name];
-  if (SLOW_PROVIDERS.has(name)) return -1;
-  return 0;
-}
 
 function sortSources(a: Source, b: Source): number {
-  const pa = sourcePriority(a);
-  const pb = sourcePriority(b);
+  const pa = PROVIDER_PRIORITY[a.provider?.name ?? ""] ?? 0;
+  const pb = PROVIDER_PRIORITY[b.provider?.name ?? ""] ?? 0;
   if (pa !== pb) return pb - pa;
-  // Same tier: prefer English audio
   const aEng = a.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
   const bEng = b.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
   if (aEng !== bEng) return bEng - aEng;
-  // Then higher quality
   const qa = parseInt(a.quality, 10);
   const qb = parseInt(b.quality, 10);
   return (isNaN(qb) ? 0 : qb) - (isNaN(qa) ? 0 : qa);
@@ -93,7 +81,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchId = useRef(0);
 
-  // Initial fetch sets the first source
   const applySources = (sorted: Source[]) => {
     const mapped: ServerSource[] = sorted.map((s) => ({
       url: s.url,
@@ -102,16 +89,17 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       provider: s.provider,
     }));
     setSources(mapped);
-    setActiveIdx(0);
-    setStreamUrl(mapped[0].url);
-    setStreamType(mapped[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+    if (mapped.length > 0) {
+      setActiveIdx(0);
+      setStreamUrl(mapped[0].url);
+      setStreamType(mapped[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+    }
   };
 
   const fetchStreams = () => {
     const currentId = ++fetchId.current;
     const key = cacheKey(id, mediaType, season, episode);
 
-    // LocalStorage cache for instant repeat views
     const cached = getCache(key);
     if (cached && currentId === fetchId.current) {
       applySources(cached);
@@ -126,12 +114,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       .then((data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        let sorted = [...data.sources].sort(sortSources);
-        // Remove VidApi sources if any better provider exists
-        if (sorted.some((s) => sourcePriority(s) > 0)) {
-          const filtered = sorted.filter((s) => !SLOW_PROVIDERS.has(s.provider?.name ?? ""));
-          if (filtered.length > 0) sorted = filtered;
-        }
+        const sorted = [...data.sources].sort(sortSources);
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
       })
@@ -147,17 +130,19 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   useEffect(fetchStreams, [id, mediaType, season, episode]);
 
   const handleSourceChange = (idx: number) => {
+    if (idx < 0 || idx >= sources.length) return;
     setActiveIdx(idx);
     setStreamUrl(sources[idx].url);
     setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
   };
 
-  // Auto-retry: cycle to next source on playback error
   const handlePlaybackError = () => {
     if (sources.length <= 1) return;
     const nextIdx = (activeIdx + 1) % sources.length;
     handleSourceChange(nextIdx);
   };
+
+  const currentProvider = sources[activeIdx]?.provider?.name ?? "";
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -176,7 +161,27 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         </div>
       )}
 
-      {/* Player (loading state is handled internally) */}
+      {/* Provider indicator */}
+      {sources.length > 0 && (
+        <div className="mb-2 flex items-center gap-3 text-xs text-white/40">
+          <span>Available: {sources.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => handleSourceChange(i)}
+              className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 font-medium transition-all ${
+                i === activeIdx
+                  ? "bg-primary text-white shadow-sm shadow-primary/30"
+                  : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {s.provider?.name ?? "Server"}
+              {s.quality && <span className="text-[10px] opacity-60">{s.quality}</span>}
+            </button>
+          ))}</span>
+        </div>
+      )}
+
+      {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
           <div className="aspect-video w-full">
