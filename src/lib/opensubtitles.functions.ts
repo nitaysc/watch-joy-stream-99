@@ -34,6 +34,8 @@ interface SubSearchResponse {
   }[];
 }
 
+const API_KEY = process.env.VITE_OPENSUBTITLES_API_KEY || "QwGYtyCVP7UTixkKh7bViVfW9tMeJH2g";
+
 function srtToVtt(srt: string): string {
   let vtt = "WEBVTT\n\n";
   vtt += srt
@@ -45,9 +47,6 @@ function srtToVtt(srt: string): string {
 export const searchSubtitles = createServerFn({ method: "GET" })
   .inputValidator((d: SubSearchParams) => d)
   .handler(async ({ data }) => {
-    const apiKey = process.env.VITE_OPENSUBTITLES_API_KEY;
-    if (!apiKey) return [];
-
     const params = new URLSearchParams();
     params.set("tmdb_id", String(data.tmdbId));
     params.set("languages", data.language ?? "en");
@@ -60,7 +59,7 @@ export const searchSubtitles = createServerFn({ method: "GET" })
 
     const res = await fetch(`https://api.opensubtitles.com/api/v1/subtitles?${params}`, {
       headers: {
-        "Api-Key": apiKey,
+        "Api-Key": API_KEY,
         "User-Agent": "Cinely v1",
       },
     });
@@ -81,13 +80,10 @@ export const searchSubtitles = createServerFn({ method: "GET" })
 export const getSubtitleVtt = createServerFn({ method: "GET" })
   .inputValidator((d: { file_id: number }) => d)
   .handler(async ({ data }) => {
-    const apiKey = process.env.VITE_OPENSUBTITLES_API_KEY;
-    if (!apiKey) throw new Error("OpenSubtitles API key not configured");
-
     const dlRes = await fetch("https://api.opensubtitles.com/api/v1/download", {
       method: "POST",
       headers: {
-        "Api-Key": apiKey,
+        "Api-Key": API_KEY,
         "User-Agent": "Cinely v1",
         "Content-Type": "application/json",
       },
