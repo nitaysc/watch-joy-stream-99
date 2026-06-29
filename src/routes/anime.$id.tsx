@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { getAnimeInfo, getEpisodeSources, type AnimeInfo, type EpisodeSources } from "@/lib/consumet.functions";
-import HlsPlayer from "@/components/HlsPlayer";
+import HlsPlayer, { type ServerSource } from "@/components/HlsPlayer";
 import { Play, ChevronDown, Star, Calendar, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/anime/$id")({
@@ -24,6 +24,8 @@ function AnimePage() {
   const [selectedEp, setSelectedEp] = useState<number>(1);
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState("application/x-mpegURL");
+  const [epSources, setEpSources] = useState<ServerSource[]>([]);
+  const [activeEpSourceIdx, setActiveEpSourceIdx] = useState(0);
   const [epLoading, setEpLoading] = useState(false);
 
   useEffect(() => {
@@ -47,15 +49,29 @@ function AnimePage() {
           const rb = parseInt(b.quality ?? "0", 10) || 0;
           return rb - ra;
         });
-        const best = sorted.length > 0 ? sorted[0] : data.sources?.[0];
+        const mapped: ServerSource[] = sorted.map((s) => ({
+          url: s.url,
+          quality: s.quality,
+          provider: { name: s.isM3U8 ? "HLS" : "MP4" },
+        }));
+        setEpSources(mapped);
+        const best = mapped[0] ?? (data.sources?.[0] ? { url: data.sources[0].url, quality: data.sources[0].quality, provider: { name: "Stream" } } : null);
         if (best) {
+          setActiveEpSourceIdx(0);
           setStreamUrl(best.url);
-          const isM3U8 = best.isM3U8 ?? best.url?.includes(".m3u8");
+          const isM3U8 = best.url?.includes(".m3u8");
           setStreamType(isM3U8 ? "application/x-mpegURL" : "video/mp4");
         }
       })
       .catch(() => {})
       .finally(() => setEpLoading(false));
+  };
+
+  const handleAnimeSourceChange = (idx: number) => {
+    setActiveEpSourceIdx(idx);
+    setStreamUrl(epSources[idx].url);
+    const isM3U8 = epSources[idx].url?.includes(".m3u8");
+    setStreamType(isM3U8 ? "application/x-mpegURL" : "video/mp4");
   };
 
   if (loading) {
@@ -98,6 +114,9 @@ function AnimePage() {
                 type={streamType}
                 poster={anime.image}
                 autoplay
+                sources={epSources}
+                activeSourceIdx={activeEpSourceIdx}
+                onSourceChange={handleAnimeSourceChange}
               />
             </div>
           ) : (

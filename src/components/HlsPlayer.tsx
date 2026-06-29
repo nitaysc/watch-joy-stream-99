@@ -3,14 +3,27 @@ import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "videojs-contrib-quality-levels";
 import "@videojs/http-streaming";
-import { Play, Pause, Maximize, Minimize, SkipBack, SkipForward, Loader2, Subtitles, Languages } from "lucide-react";
+import {
+  Play, Pause, Maximize, Minimize, SkipBack, SkipForward,
+  Loader2, Subtitles, Languages, Server
+} from "lucide-react";
 import "./modern-player.css";
+
+export interface ServerSource {
+  url: string;
+  type?: string;
+  quality?: string;
+  provider?: { name: string };
+}
 
 interface HlsPlayerProps {
   src: string;
   type?: string;
   poster?: string;
   autoplay?: boolean;
+  sources?: ServerSource[];
+  activeSourceIdx?: number;
+  onSourceChange?: (idx: number) => void;
 }
 
 function formatTime(s: number) {
@@ -23,13 +36,16 @@ function formatTime(s: number) {
 }
 
 function volumeIcon(vol: number, muted: boolean) {
-  if (muted || vol === 0) return <Loader2 className="h-4 w-4" />; /* placeholder — handled below */
+  if (muted || vol === 0) return "mute";
   if (vol < 0.33) return "low";
   if (vol < 0.66) return "mid";
   return "high";
 }
 
-export default function HlsPlayer({ src, type = "application/x-mpegURL", poster, autoplay = false }: HlsPlayerProps) {
+export default function HlsPlayer({
+  src, type = "application/x-mpegURL", poster, autoplay = false,
+  sources = [], activeSourceIdx = 0, onSourceChange
+}: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,7 +62,9 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [quality, setQuality] = useState("Auto");
+  const [qualityLevels, setQualityLevels] = useState<{ height: number; label: string }[]>([]);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
+  const [showServerMenu, setShowServerMenu] = useState(false);
   const [tracks, setTracks] = useState<{ kind: string; label: string; language: string; mode: string }[]>([]);
   const [audioTracks, setAudioTracks] = useState<{ label: string; language: string; enabled: boolean }[]>([]);
   const [showCcm, setShowCcm] = useState(false);
@@ -57,6 +75,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     setShowCcm(false);
     setShowAudioMenu(false);
     setShowQualityMenu(false);
+    setShowServerMenu(false);
     if (playing) {
       clearTimeout(hideTimer.current);
       hideTimer.current = setTimeout(() => setShowControls(false), 3000);
@@ -104,7 +123,6 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     }
   };
 
-  // Track updates from Video.js
   const updateTracks = useCallback(() => {
     const p = playerRef.current;
     if (!p) return;
@@ -126,6 +144,42 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
       }
       setAudioTracks(list);
     }
+  }, []);
+
+  const refreshQualityLevels = useCallback(() => {
+    const p = playerRef.current;
+    if (!p?.qualityLevels) return;
+    try {
+      const ql = p.qualityLevels();
+      const levels: { height: number; label: string }[] = [];
+      for (let i = 0; i < ql.length; i++) {
+        const h = ql[i]?.height;
+        if (h) levels.push({ height: h, label: `${h}p` });
+      }
+      levels.sort((a, b) => b.height - a.height);
+      if (levels.length > 0) setQualityLevels(levels);
+    } catch {}
+  }, []);
+
+  const handleQualityChange = useCallback((q: string) => {
+    setQuality(q);
+    setShowQualityMenu(false);
+    const p = playerRef.current;
+    if (!p?.qualityLevels) return;
+    try {
+      const ql = p.qualityLevels();
+      if (q === "Auto") {
+        ql.selectedIndex_ = -1;
+      } else {
+        const targetHeight = parseInt(q, 10);
+        for (let i = 0; i < ql.length; i++) {
+          if (ql[i]?.height === targetHeight) {
+            ql.selectedIndex_ = i;
+            break;
+          }
+        }
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -158,6 +212,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     return () => window.removeEventListener("keydown", onKey);
   }, [duration]);
 
+  // Init Video.js
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -184,10 +239,10 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     player.on("play", () => setPlaying(true));
     player.on("pause", () => setPlaying(false));
     player.on("waiting", () => setLoading(true));
-    player.on("canplay", () => { setLoading(false); updateTracks(); });
+    player.on("canplay", () => { setLoading(false); updateTracks(); refreshQualityLevels(); });
     player.on("playing", () => setLoading(false));
     player.on("error", () => setError(true));
-    player.on("loadedmetadata", () => { setDuration(player.duration() ?? 0); updateTracks(); });
+    player.on("loadedmetadata", () => { setDuration(player.duration() ?? 0); updateTracks(); refreshQualityLevels(); });
     player.on("timeupdate", () => {
       setCurrentTime(player.currentTime() ?? 0);
       setDuration(player.duration() ?? 0);
@@ -198,11 +253,13 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     });
     player.on("qualitylevelschange", () => {
       const ql = player.qualityLevels();
-      const idx = ql.selectedIndex;
-      if (idx >= 0 && ql[idx]) setQuality(`${ql[idx].height}p`);
+      if (ql) {
+        const idx = ql.selectedIndex;
+        if (idx >= 0 && ql[idx]?.height) setQuality(`${ql[idx].height}p`);
+        refreshQualityLevels();
+      }
     });
 
-    // Track changes
     player.textTracks()?.addEventListener("change", updateTracks);
     player.audioTracks()?.addEventListener("change", updateTracks);
 
@@ -210,12 +267,15 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
     return () => { player.dispose(); playerRef.current = null; };
   }, []);
 
+  // Source changes
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
     if (player.currentSrc() !== src) {
       setError(false);
       setLoading(true);
+      setQuality("Auto");
+      setQualityLevels([]);
       player.src({ src, type });
       if (autoplay) player.play();
     }
@@ -234,6 +294,8 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
   const hasSubtitles = subtitleTracks.length > 0;
   const hasAudioTracks = audioTracks.length > 0;
 
+  const activeSource = sources[activeSourceIdx];
+
   return (
     <div
       ref={containerRef}
@@ -242,7 +304,6 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
       onMouseLeave={() => playing && setShowControls(false)}
       onClick={togglePlay}
     >
-      {/* Ambient glow */}
       {poster && (
         <div className="pointer-events-none absolute inset-0 opacity-20 transition-opacity duration-700">
           <img src={poster} alt="" className="h-full w-full scale-150 object-cover blur-3xl" />
@@ -250,17 +311,11 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
         </div>
       )}
 
-      {/* Video.js wrapper */}
       <div data-vjs-player className="h-full w-full">
-        <video
-          ref={videoRef}
-          className="video-js vjs-modern-theme h-full w-full"
-          playsInline
-          poster={poster}
-        />
+        <video ref={videoRef} className="video-js vjs-modern-theme h-full w-full" playsInline poster={poster} />
       </div>
 
-      {/* Loading */}
+      {/* Loading spinner inside the player area */}
       {loading && !error && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="relative">
@@ -272,7 +327,6 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
         </div>
       )}
 
-      {/* Error */}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10">
@@ -282,9 +336,8 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
         </div>
       )}
 
-      {/* Big play */}
       {!playing && !loading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div className="absolute inset-0 flex items-center justify-center" onClick={(e) => { e.stopPropagation(); togglePlay(); }}>
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/90 backdrop-blur-md shadow-2xl shadow-primary/30 ring-1 ring-white/20 transition-all duration-300 hover:scale-110 hover:bg-primary hover:shadow-primary/50">
             <Play className="ml-1 h-8 w-8 fill-white text-white" />
           </div>
@@ -354,8 +407,6 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
               >
                 {volIcon === "mute" ? (
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
-                ) : volIcon === "low" ? (
-                  <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
                 ) : (
                   <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 5L6 9H2v6h4l5 4V5z"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
                 )}
@@ -363,27 +414,87 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
               <div className="w-0 overflow-hidden transition-all duration-200 group-hover/vol:w-20">
                 <input
                   type="range"
-                  min={0}
-                  max={1}
-                  step={0.01}
+                  min={0} max={1} step={0.01}
                   value={muted ? 0 : volume}
                   onChange={handleVolumeChange}
                   onClick={(e) => e.stopPropagation()}
                   className="h-1 w-full appearance-none rounded-full bg-white/10 cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-primary/30"
-                  style={{
-                    background: `linear-gradient(to right, #e85c5c ${(muted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(muted ? 0 : volume) * 100}%)`,
-                  }}
+                  style={{ background: `linear-gradient(to right, #e85c5c ${(muted ? 0 : volume) * 100}%, rgba(255,255,255,0.1) ${(muted ? 0 : volume) * 100}%)` }}
                 />
               </div>
             </div>
 
             <div className="flex-1" />
 
+            {/* Server selector (when multiple sources) */}
+            {sources.length > 1 && (
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowServerMenu(!showServerMenu); setShowCcm(false); setShowAudioMenu(false); setShowQualityMenu(false); }}
+                  className="flex h-7 items-center gap-1 rounded-lg bg-white/5 px-2 text-[10px] font-semibold tracking-wider text-white/50 uppercase transition-all duration-200 hover:bg-white/10 hover:text-white"
+                >
+                  <Server className="h-3 w-3" />
+                  {activeSource?.provider?.name ?? `Server ${activeSourceIdx + 1}`}
+                </button>
+                {showServerMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 min-w-[150px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
+                    {sources.map((s, i) => (
+                      <button
+                        key={i}
+                        onClick={(e) => { e.stopPropagation(); onSourceChange?.(i); setShowServerMenu(false); }}
+                        className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
+                          i === activeSourceIdx ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {s.provider?.name ?? `Server ${i + 1}`}
+                        <span className="ml-1.5 text-[10px] text-white/30">{s.quality}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Quality selector */}
+            {qualityLevels.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowCcm(false); setShowAudioMenu(false); setShowServerMenu(false); }}
+                  className="flex h-7 items-center rounded-lg bg-white/5 px-2 text-[10px] font-semibold tracking-wider text-white/50 uppercase transition-all duration-200 hover:bg-white/10 hover:text-white"
+                >
+                  {quality}
+                </button>
+                {showQualityMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 min-w-[100px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
+                    <button
+                      onClick={() => handleQualityChange("Auto")}
+                      className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
+                        quality === "Auto" ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
+                      }`}
+                    >
+                      Auto
+                    </button>
+                    {qualityLevels.map((l) => (
+                      <button
+                        key={l.height}
+                        onClick={() => handleQualityChange(l.label)}
+                        className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
+                          quality === l.label ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        {l.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Subtitles / CC */}
             {hasSubtitles && (
               <div className="relative">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowCcm(!showCcm); setShowAudioMenu(false); setShowQualityMenu(false); }}
+                  onClick={(e) => { e.stopPropagation(); setShowCcm(!showCcm); setShowAudioMenu(false); setShowQualityMenu(false); setShowServerMenu(false); }}
                   className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:bg-white/10 ${
                     subtitleTracks.some((t) => t.mode === "showing") ? "text-primary" : "text-white/40 hover:text-white"
                   }`}
@@ -398,7 +509,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
                         const p = playerRef.current;
                         if (!p) return;
                         const tt = p.textTracks();
-                        for (let i = 0; i < tt.length; i++) { tt[i].mode = "disabled"; }
+                        for (let i = 0; i < tt.length; i++) tt[i].mode = "disabled";
                         setShowCcm(false);
                         updateTracks();
                       }}
@@ -416,7 +527,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
                           const p = playerRef.current;
                           if (!p) return;
                           const tt = p.textTracks();
-                          for (let j = 0; j < tt.length; j++) { tt[j].mode = j === i ? "showing" : "disabled"; }
+                          for (let j = 0; j < tt.length; j++) tt[j].mode = j === i ? "showing" : "disabled";
                           setShowCcm(false);
                           updateTracks();
                         }}
@@ -436,7 +547,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
             {hasAudioTracks && (
               <div className="relative">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowAudioMenu(!showAudioMenu); setShowCcm(false); setShowQualityMenu(false); }}
+                  onClick={(e) => { e.stopPropagation(); setShowAudioMenu(!showAudioMenu); setShowCcm(false); setShowQualityMenu(false); setShowServerMenu(false); }}
                   className="flex h-8 w-8 items-center justify-center rounded-xl text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white"
                 >
                   <Languages className="h-4 w-4" />
@@ -451,7 +562,7 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
                           const p = playerRef.current;
                           if (!p) return;
                           const at = p.audioTracks();
-                          for (let j = 0; j < at.length; j++) { at[j].enabled = j === i; }
+                          for (let j = 0; j < at.length; j++) at[j].enabled = j === i;
                           setShowAudioMenu(false);
                           updateTracks();
                         }}
@@ -466,31 +577,6 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
                 )}
               </div>
             )}
-
-            {/* Quality */}
-            <div className="relative">
-              <button
-                onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); setShowCcm(false); setShowAudioMenu(false); }}
-                className="flex h-7 items-center rounded-lg bg-white/5 px-2 text-[10px] font-semibold tracking-wider text-white/50 uppercase transition-all duration-200 hover:bg-white/10 hover:text-white"
-              >
-                {quality}
-              </button>
-              {showQualityMenu && (
-                <div className="absolute bottom-full right-0 mb-2 min-w-[110px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
-                  {["Auto", "2160p", "1080p", "720p", "480p", "360p"].map((q) => (
-                    <button
-                      key={q}
-                      onClick={(e) => { e.stopPropagation(); setQuality(q); setShowQualityMenu(false); }}
-                      className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
-                        quality === q ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
-                      }`}
-                    >
-                      {q}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
 
             {/* Fullscreen */}
             <button

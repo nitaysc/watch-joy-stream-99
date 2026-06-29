@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
-import HlsPlayer from "@/components/HlsPlayer";
+import HlsPlayer, { type ServerSource } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 
 interface MediaDetailsProps {
@@ -60,14 +60,22 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sources, setSources] = useState<Source[]>([]);
+  const [sources, setSources] = useState<ServerSource[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchId = useRef(0);
 
+  // Initial fetch sets the first source
   const applySources = (sorted: Source[]) => {
-    setSources(sorted);
-    setStreamUrl(sorted[0].url);
-    setStreamType(sorted[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+    const mapped: ServerSource[] = sorted.map((s) => ({
+      url: s.url,
+      type: s.type,
+      quality: s.quality,
+      provider: s.provider,
+    }));
+    setSources(mapped);
+    setActiveIdx(0);
+    setStreamUrl(mapped[0].url);
+    setStreamType(mapped[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
   };
 
   const fetchStreams = () => {
@@ -79,9 +87,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
     if (cached && currentId === fetchId.current) {
       applySources(cached);
       setIsLoading(false);
+      return;
     }
 
     setIsLoading(true);
+    setError(null);
 
     getStreams({ data: { id, mediaType, season, episode } })
       .then((data) => {
@@ -102,7 +112,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
 
   useEffect(fetchStreams, [id, mediaType, season, episode]);
 
-  const switchSource = (idx: number) => {
+  const handleSourceChange = (idx: number) => {
     setActiveIdx(idx);
     setStreamUrl(sources[idx].url);
     setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
@@ -125,41 +135,19 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         </div>
       )}
 
-      {/* Server bar */}
-      {streamUrl && sources.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-2 animate-fade-in">
-          {sources.map((s, i) => (
-            <button
-              key={i}
-              onClick={() => switchSource(i)}
-              className={`group flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-300 ${
-                i === activeIdx
-                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-1 ring-primary/50"
-                  : "bg-white/[0.04] text-white/60 ring-1 ring-white/10 hover:bg-white/10 hover:text-white hover:ring-white/20"
-              }`}
-            >
-              {s.provider?.name ?? "Server"}
-              <span className={`${i === activeIdx ? "text-primary-foreground/70" : "text-white/30"} font-normal`}>
-                {s.quality}
-              </span>
-              {i === activeIdx && (
-                <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary-foreground/60 animate-pulse" />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Player */}
+      {/* Player (loading state is handled internally) */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
           <div className="aspect-video w-full">
             <HlsPlayer
-              key={activeIdx}
+              key={`${activeIdx}-${streamUrl}`}
               src={streamUrl}
               type={streamType}
               poster={poster}
               autoplay
+              sources={sources}
+              activeSourceIdx={activeIdx}
+              onSourceChange={handleSourceChange}
             />
           </div>
         ) : (
