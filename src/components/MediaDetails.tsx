@@ -32,6 +32,13 @@ function toUrl(id: string | number, mediaType: string, season?: string, episode?
   return `${CINEPRO_BASE}/v1/movies/${id}`;
 }
 
+function fixSourceUrl(url: string, base: string): string {
+  if (url.startsWith("http://localhost:3000")) {
+    return url.replace("http://localhost:3000", base);
+  }
+  return url;
+}
+
 function qualityRank(q: string): number {
   const n = parseInt(q, 10);
   return isNaN(n) ? 0 : n;
@@ -60,7 +67,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       .then((data) => {
         if (cancelled) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        const sorted = [...data.sources].sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
+        const sorted = [...data.sources]
+          .map((s) => ({ ...s, url: fixSourceUrl(s.url, CINEPRO_BASE) }))
+          .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
         setSources(sorted);
         setStreamUrl(sorted[0].url);
         setStreamType(sorted[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
