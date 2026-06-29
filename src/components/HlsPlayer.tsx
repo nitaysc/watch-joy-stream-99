@@ -1,9 +1,8 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
 import "videojs-contrib-quality-levels";
 import "@videojs/http-streaming";
-import { getProxiedUrl } from "@/lib/proxy";
 
 interface HlsPlayerProps {
   src: string;
@@ -24,7 +23,6 @@ export default function HlsPlayer({
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
-  const proxiedSrc = useMemo(() => getProxiedUrl(src), [src]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -44,7 +42,7 @@ export default function HlsPlayer({
       },
     });
     player.qualityLevels();
-    player.src({ src: proxiedSrc, type: "application/x-mpegURL" });
+    player.src({ src, type: "application/x-mpegURL" });
     playerRef.current = player;
     return () => {
       player.dispose();
@@ -55,11 +53,11 @@ export default function HlsPlayer({
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
-    if (player.currentSrc() !== proxiedSrc) {
-      player.src({ src: proxiedSrc, type: "application/x-mpegURL" });
+    if (player.currentSrc() !== src) {
+      player.src({ src, type: "application/x-mpegURL" });
       player.play();
     }
-  }, [proxiedSrc]);
+  }, [src]);
 
   return (
     <div data-vjs-player className="relative" style={{ width, height }}>
