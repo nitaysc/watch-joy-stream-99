@@ -1,9 +1,11 @@
 import { Link } from "@tanstack/react-router";
 import type { MediaItem } from "@/lib/tmdb.functions";
 import { Star } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 export function MediaCard({ item }: { item: MediaItem }) {
   const to = item.type === "movie" ? "/movie/$id" : "/tv/$id";
+  const { t } = useTranslation();
   return (
     <Link
       to={to}
@@ -20,7 +22,7 @@ export function MediaCard({ item }: { item: MediaItem }) {
           />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-            No image
+            {t("No image")}
           </div>
         )}
         {item.rating > 0 && (
@@ -30,7 +32,7 @@ export function MediaCard({ item }: { item: MediaItem }) {
           </div>
         )}
         <div className="absolute top-2 left-2 rounded bg-primary/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
-          {item.type}
+          {item.type === "movie" ? t("Movie") : t("TV Series")}
         </div>
       </div>
       <div className="mt-2">

@@ -38,7 +38,10 @@ const resources = {
       "S": "S",
       "E": "E",
       "Episodes": "Episodes",
-      "Loading episodes...": "Loading episodes..."
+      "Loading episodes...": "Loading episodes...",
+      "No image": "No image",
+      "Movie": "Movie",
+      "TV Series": "TV Series"
     }
   },
   he: {
@@ -77,7 +80,10 @@ const resources = {
       "S": "עונה ",
       "E": "פרק ",
       "Episodes": "פרקים",
-      "Loading episodes...": "טוען פרקים..."
+      "Loading episodes...": "טוען פרקים...",
+      "No image": "אין תמונה",
+      "Movie": "סרט",
+      "TV Series": "סדרה"
     }
   },
   ru: {
@@ -116,7 +122,10 @@ const resources = {
       "S": "С",
       "E": "Э",
       "Episodes": "Эпизоды",
-      "Loading episodes...": "Загрузка эпизодов..."
+      "Loading episodes...": "Загрузка эпизодов...",
+      "No image": "Нет изображения",
+      "Movie": "Фильм",
+      "TV Series": "Сериал"
     }
   }
 };
