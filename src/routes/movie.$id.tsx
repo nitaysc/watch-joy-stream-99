@@ -4,7 +4,6 @@ import { getMovie } from "@/lib/tmdb.functions";
 import { Star, Clock, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
-import { PlayerShell } from "@/components/ui/player-shell";
 
 const movieQuery = (id: number, language: string) =>
   queryOptions({ queryKey: ["movie", id, language], queryFn: () => getMovie({ data: { id, language } }) });
@@ -27,10 +26,20 @@ function MoviePage() {
   const { id } = Route.useParams();
   const { t, i18n } = useTranslation();
   const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
+  const src = `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <PlayerShell tmdbId={Number(id)} type="movie" title={m.title} />
+      <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border shadow-glow relative">
+        <div className="aspect-video w-full">
+          <iframe
+            src={src}
+            className="h-full w-full"
+            allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+            allowFullScreen
+          />
+        </div>
+      </div>
 
       <div className="mt-8 grid gap-8 md:grid-cols-[200px_1fr]">
         {m.poster && (
