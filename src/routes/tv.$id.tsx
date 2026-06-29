@@ -41,6 +41,12 @@ function TvPage() {
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
+  const episodes = seasonData?.episodes ?? [];
+  const totalEpisodes = episodes.length;
+  const currentEpIdx = episodes.findIndex((e) => e.episode_number === episode);
+  const prevEpisode = currentEpIdx > 0 ? episodes[currentEpIdx - 1] : null;
+  const nextEpisode = currentEpIdx < totalEpisodes - 1 ? episodes[currentEpIdx + 1] : null;
+
   return (
     <main>
       {/* Backdrop */}
@@ -53,7 +59,16 @@ function TvPage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
         <div className="animate-fade-in">
-          <MediaDetails id={tvId} mediaType="tv" poster={m.backdrop} season={String(season)} episode={String(episode)} />
+          <MediaDetails
+            id={tvId}
+            mediaType="tv"
+            poster={m.backdrop}
+            season={String(season)}
+            episode={String(episode)}
+            episodeInfo={`S${season} · E${episode}`}
+            onPrevEpisode={prevEpisode ? () => { setEpisode(prevEpisode.episode_number); } : undefined}
+            onNextEpisode={nextEpisode ? () => { setEpisode(nextEpisode.episode_number); } : undefined}
+          />
         </div>
 
         {/* Season & Episode Controls */}

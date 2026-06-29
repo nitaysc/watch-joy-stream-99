@@ -9,6 +9,9 @@ interface MediaDetailsProps {
   poster?: string;
   season?: string;
   episode?: string;
+  episodeInfo?: string;
+  onPrevEpisode?: () => void;
+  onNextEpisode?: () => void;
 }
 
 interface Source {
@@ -72,7 +75,7 @@ function sortSources(a: Source, b: Source): number {
   return (isNaN(qb) ? 0 : qb) - (isNaN(qa) ? 0 : qa);
 }
 
-export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
+export default function MediaDetails({ id, mediaType, poster, season, episode, episodeInfo, onPrevEpisode, onNextEpisode }: MediaDetailsProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
   const [isLoading, setIsLoading] = useState(true);
@@ -115,6 +118,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
 
     setIsLoading(true);
     setError(null);
+    setStreamUrl(null);
 
     getStreams({ data: { id, mediaType, season, episode } })
       .then((data) => {
@@ -181,6 +185,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
               activeSourceIdx={activeIdx}
               onSourceChange={handleSourceChange}
               onError={handlePlaybackError}
+              episodeInfo={episodeInfo}
+              onPrevEpisode={onPrevEpisode}
+              onNextEpisode={onNextEpisode}
             />
           </div>
         ) : (

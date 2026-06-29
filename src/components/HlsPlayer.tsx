@@ -5,7 +5,7 @@ import "videojs-contrib-quality-levels";
 import "@videojs/http-streaming";
 import {
   Play, Pause, Maximize, Minimize, SkipBack, SkipForward,
-  Loader2, Subtitles, Languages, Server
+  Loader2, Subtitles, Languages, Server, ChevronLeft, ChevronRight
 } from "lucide-react";
 import "./modern-player.css";
 
@@ -25,6 +25,9 @@ interface HlsPlayerProps {
   activeSourceIdx?: number;
   onSourceChange?: (idx: number) => void;
   onError?: () => void;
+  episodeInfo?: string;
+  onPrevEpisode?: () => void;
+  onNextEpisode?: () => void;
 }
 
 function formatTime(s: number) {
@@ -45,7 +48,8 @@ function volumeIcon(vol: number, muted: boolean) {
 
 export default function HlsPlayer({
   src, type = "application/x-mpegURL", poster, autoplay = false,
-  sources = [], activeSourceIdx = 0, onSourceChange, onError
+  sources = [], activeSourceIdx = 0, onSourceChange, onError,
+  episodeInfo, onPrevEpisode, onNextEpisode
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
@@ -231,6 +235,13 @@ export default function HlsPlayer({
           overrideNative: true,
           enableLowInitialPlaylist: true,
           smoothQualityChange: true,
+          backBufferLength: 0,
+          maxBufferLength: 15,
+          maxMaxBufferLength: 30,
+          startLevel: 1,
+          fragLoadingTimeOut: 10000,
+          manifestLoadingTimeOut: 10000,
+          levelLoadingTimeOut: 10000,
         },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
@@ -459,6 +470,29 @@ export default function HlsPlayer({
             </div>
 
             <div className="flex-1" />
+
+            {/* Episode navigation (TV shows) */}
+            {(onPrevEpisode || onNextEpisode) && (
+              <div className="flex items-center gap-0.5 mr-1">
+                <button
+                  onClick={(e) => { e.stopPropagation(); onPrevEpisode?.(); }}
+                  disabled={!onPrevEpisode}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:pointer-events-none"
+                >
+                  <ChevronLeft className="h-3.5 w-3.5" />
+                </button>
+                {episodeInfo && (
+                  <span className="text-[10px] font-medium tracking-wide text-white/50 px-1 whitespace-nowrap">{episodeInfo}</span>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onNextEpisode?.(); }}
+                  disabled={!onNextEpisode}
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white disabled:opacity-20 disabled:pointer-events-none"
+                >
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
 
             {/* Server selector (when multiple sources) */}
             {sources.length > 1 && (
