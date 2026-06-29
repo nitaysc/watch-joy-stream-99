@@ -14,25 +14,6 @@ interface CineProResponse {
   sources: Source[];
 }
 
-function extractDirectInfo(proxyUrl: string): { directUrl: string; headers: Record<string, string> } | null {
-  try {
-    const match = proxyUrl.match(/data=([^&]+)/);
-    if (!match) return null;
-    const decoded = JSON.parse(decodeURIComponent(match[1]));
-    return {
-      directUrl: decoded.url,
-      headers: decoded.headers ?? {},
-    };
-  } catch {
-    return null;
-  }
-}
-
-// Override source URL to always use CinePro proxy (relative paths in HLS playlists require it)
-function toProxyUrl(sourceUrl: string, cineproBase: string): string {
-  return sourceUrl.replace(/http:\/\/localhost:\d+/, cineproBase);
-}
-
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -47,12 +28,6 @@ async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Respons
   }
 }
 
-function buildUrl(base: string, mediaType: string, id: string | number, season?: string, episode?: string): string {
-  return mediaType === "tv"
-    ? `${base}/v1/tv/${id}/seasons/${season ?? "1"}/episodes/${episode ?? "1"}`
-    : `${base}/v1/movies/${id}`;
-}
-
 export const getStreams = createServerFn({ method: "GET" })
   .inputValidator((d: {
     id: string | number;
@@ -62,7 +37,9 @@ export const getStreams = createServerFn({ method: "GET" })
   }) => d)
   .handler(async ({ data }) => {
     const CINEPRO_BASE = process.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
-    const url = buildUrl(CINEPRO_BASE, data.mediaType, data.id, data.season, data.episode);
+    const url = mediaType === "tv"
+      ? `${CINEPRO_BASE}/v1/tv/${data.id}/seasons/${data.season ?? "1"}/episodes/${data.episode ?? "1"}`
+      : `${CINEPRO_BASE}/v1/movies/${data.id}`;
 
     try {
       const cache = caches.default as any;
@@ -100,33 +77,12 @@ export const getStreams = createServerFn({ method: "GET" })
       json = await res.json();
     }
 
-    // Ensure all source URLs go through CinePro proxy (HLS playlists contain relative paths)
+    // Rewrite localhost proxy URLs to the actual CinePro base
     if (json.sources) {
       json.sources = json.sources.map((s) => ({
         ...s,
-        url: toProxyUrl(s.url, CINEPRO_BASE),
+        url: s.url.replace(/http:\/\/localhost:\d+/, CINEPRO_BASE),
       }));
-
-      // Validate each source by fetching its master playlist through the proxy
-      const validated = await Promise.allSettled(
-        json.sources.map(async (s) => {
-          const res = await fetch(s.url, { signal: AbortSignal.timeout(10000) });
-          if (!res.ok) throw new Error(`status ${res.status}`);
-          const text = await res.text();
-          if (text.includes("<!DOCTYPE") || text.includes("<html") || text.includes("<title>Forbidden")) {
-            throw new Error("source returned error page");
-          }
-          return s;
-        })
-      );
-
-      json.sources = validated
-        .filter((r) => r.status === "fulfilled")
-        .map((r) => (r as PromiseFulfilledResult<Source>).value);
-
-      if (json.sources.length === 0) {
-        throw new Error("All source providers returned broken streams");
-      }
     }
 
     try {
