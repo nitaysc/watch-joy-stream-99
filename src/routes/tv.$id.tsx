@@ -47,6 +47,7 @@ function TvPage() {
     { name: "VidKing", url: `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true` },
     { name: "EmbedSU", url: `https://embed.su/embed/tv/${tvId}/${season}/${episode}` },
     { name: "VidSrc", url: `https://vidsrc.cc/v2/embed/tv/${tvId}/${season}/${episode}` },
+    { name: "AnimeX", url: `https://player.autoembed.cc/embed/tv/${tvId}/${season}/${episode}` },
   ];
   
   const { pings, checking, bestIndex, setBestIndex } = useServerPing(servers, tvId === 37854);
