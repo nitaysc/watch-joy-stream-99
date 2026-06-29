@@ -33,6 +33,8 @@
   --font-display: "Inter", ui-sans-serif, system-ui, sans-serif;
 
   --shadow-glow: 0 10px 40px -10px oklch(0.7 0.2 25 / 0.35);
+  --shadow-glow-lg: 0 20px 60px -10px oklch(0.7 0.2 25 / 0.5);
+  --shadow-card: 0 4px 20px rgba(0, 0, 0, 0.3);
 }
 
 :root {
@@ -72,6 +74,24 @@
   * { border-color: var(--color-border); }
   html, body { background: var(--color-background); color: var(--color-foreground); }
   body { font-family: var(--font-display); -webkit-font-smoothing: antialiased; }
+
+  ::selection {
+    background: oklch(0.68 0.22 25 / 0.4);
+    color: var(--foreground);
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background: oklch(0.3 0.02 270);
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: oklch(0.4 0.02 270);
+  }
 }
 
 @utility scrollbar-hide {
@@ -88,7 +108,100 @@
   );
 }
 
+@utility hero-gradient-right {
+  background-image: linear-gradient(
+    to right,
+    var(--color-background) 0%,
+    color-mix(in oklch, var(--color-background) 50%, transparent) 50%,
+    transparent 100%
+  );
+}
+
 @utility card-hover {
-  transition: transform 250ms ease, box-shadow 250ms ease;
+  transition: transform 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1);
   &:hover { transform: translateY(-4px) scale(1.03); box-shadow: var(--shadow-glow); }
+}
+
+@utility fade-bottom {
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+}
+
+@utility fade-right {
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+}
+
+@utility shimmer {
+  background: linear-gradient(
+    90deg,
+    oklch(0.18 0.015 270) 0%,
+    oklch(0.25 0.02 270) 50%,
+    oklch(0.18 0.015 270) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in-left {
+  from { opacity: 0; transform: translateX(-20px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.6s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility animate-fade-in-left {
+  animation: fade-in-left 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@utility glass {
+  background: oklch(0.15 0.01 270 / 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid oklch(0.3 0.02 270 / 0.4);
+}
+
+@utility glass-strong {
+  background: oklch(0.12 0.01 270 / 0.8);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid oklch(0.35 0.02 270 / 0.3);
+}
+
+@utility text-glow {
+  text-shadow: 0 0 20px oklch(0.68 0.22 25 / 0.3);
+}
+
+@utility card-glow {
+  box-shadow: 0 0 30px -5px oklch(0.68 0.22 25 / 0.15);
 }

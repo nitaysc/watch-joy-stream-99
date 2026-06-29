@@ -29,35 +29,72 @@ function MoviePage() {
   const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
 
   return (
-    <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <MediaDetails id={id} mediaType="movie" poster={m.backdrop} />
+    <main>
+      {/* Backdrop */}
+      {m.backdrop && (
+        <div className="fixed inset-0 -z-10">
+          <img src={m.backdrop} alt="" className="h-full w-full object-cover opacity-20" />
+          <div className="absolute inset-0 bg-gradient-to-b from-background/80 via-background/60 to-background" />
+        </div>
+      )}
 
-      <div className="mt-8 grid gap-8 md:grid-cols-[200px_1fr]">
-        {m.poster && (
-          <img src={m.poster} alt={m.title} className="hidden w-full rounded-lg ring-1 ring-border md:block" />
-        )}
-        <div className="space-y-4">
-          <h1 className="text-3xl font-bold sm:text-4xl">{m.title}</h1>
-          {m.tagline && <p className="italic text-muted-foreground">{m.tagline}</p>}
-          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-            {m.rating > 0 && (
-              <span className="flex items-center gap-1"><Star className="h-4 w-4 fill-primary text-primary" />{m.rating.toFixed(1)}</span>
-            )}
-            {m.runtime && (
-              <span className="flex items-center gap-1"><Clock className="h-4 w-4" />{m.runtime} {t("min")}</span>
-            )}
-            {m.date && (
-              <span className="flex items-center gap-1"><Calendar className="h-4 w-4" />{m.date.slice(0, 4)}</span>
-            )}
-          </div>
-          {m.genres.length > 0 && (
-            <div className="flex flex-wrap gap-2">
-              {m.genres.map((g) => (
-                <span key={g} className="rounded-full bg-card px-3 py-1 text-xs ring-1 ring-border">{g}</span>
-              ))}
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
+        <div className="animate-fade-in">
+          <MediaDetails id={id} mediaType="movie" poster={m.backdrop} />
+        </div>
+
+        <div className="mt-10 grid gap-10 md:grid-cols-[220px_1fr]" style={{ animationDelay: "0.2s" }}>
+          {m.poster && (
+            <div className="hidden md:block animate-fade-in-left" style={{ animationDelay: "0.3s" }}>
+              <img
+                src={m.poster}
+                alt={m.title}
+                className="w-full rounded-xl ring-1 ring-white/10 shadow-card"
+              />
             </div>
           )}
-          <p className="leading-relaxed text-foreground/90">{m.overview}</p>
+          <div className="space-y-5 animate-fade-in" style={{ animationDelay: "0.3s" }}>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{m.title}</h1>
+              {m.tagline && (
+                <p className="mt-1 italic text-foreground/60">&ldquo;{m.tagline}&rdquo;</p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-4 text-sm">
+              {m.rating > 0 && (
+                <span className="flex items-center gap-1.5 rounded-full bg-yellow-500/10 px-3 py-1 text-yellow-400 ring-1 ring-yellow-500/20">
+                  <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
+                  {m.rating.toFixed(1)}
+                </span>
+              )}
+              {m.runtime && (
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" />{m.runtime} {t("min")}
+                </span>
+              )}
+              {m.date && (
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <Calendar className="h-3.5 w-3.5" />{m.date.slice(0, 4)}
+                </span>
+              )}
+            </div>
+
+            {m.genres.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {m.genres.map((g) => (
+                  <span
+                    key={g}
+                    className="rounded-full bg-white/5 px-3 py-1 text-xs ring-1 ring-white/10 backdrop-blur-sm transition-colors hover:bg-primary/10 hover:ring-primary/30"
+                  >
+                    {g}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <p className="leading-relaxed text-foreground/80 max-w-3xl">{m.overview}</p>
+          </div>
         </div>
       </div>
     </main>

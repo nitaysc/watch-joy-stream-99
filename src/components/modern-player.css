@@ -1,12 +1,11 @@
-﻿/* modern-player.css */
+﻿/* modern-player.css — Premium Video.js skin */
 
-/* Scope everything to a custom class to avoid bleeding, though video-js class usually handles this */
 .vjs-modern-theme.video-js {
   font-family: 'Inter', 'Roboto', sans-serif;
   color: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
 }
 
 /* Big Play Button */
@@ -16,94 +15,100 @@
   line-height: 80px;
   border-radius: 50%;
   border: none;
-  background-color: rgba(232, 92, 92, 0.8); /* Accent Blue */
+  background: linear-gradient(135deg, rgba(232, 92, 92, 0.9), rgba(200, 50, 50, 0.8));
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 8px 32px rgba(200, 50, 50, 0.4);
 }
 
 .vjs-modern-theme:hover .vjs-big-play-button {
-  background-color: rgba(232, 92, 92, 1);
-  transform: translate(-50%, -50%) scale(1.1);
+  background: linear-gradient(135deg, rgba(232, 92, 92, 1), rgba(200, 50, 50, 1));
+  transform: translate(-50%, -50%) scale(1.12);
+  box-shadow: 0 12px 40px rgba(232, 92, 92, 0.5);
 }
 
 .vjs-modern-theme .vjs-big-play-button .vjs-icon-placeholder:before {
-  font-size: 40px;
+  font-size: 42px;
   line-height: 80px;
 }
 
 /* Control Bar */
 .vjs-modern-theme .vjs-control-bar {
-  background: rgba(15, 15, 20, 0.6);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border-radius: 16px;
-  margin: 16px;
-  width: calc(100% - 32px);
+  background: rgba(10, 10, 15, 0.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: 20px;
+  margin: 12px 12px;
+  width: calc(100% - 24px);
   height: 54px;
   display: flex;
   align-items: center;
-  padding: 0 8px;
+  padding: 0 10px;
   bottom: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
 
 .vjs-modern-theme.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-control-bar {
   opacity: 0;
-  transform: translateY(10px);
+  transform: translateY(14px);
+}
+
+.vjs-modern-theme.vjs-has-started.vjs-user-inactive.vjs-playing .vjs-big-play-button {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.8);
 }
 
 /* Timeline / Progress Control */
 .vjs-modern-theme .vjs-progress-control {
   position: absolute;
-  top: -12px;
+  top: -14px;
   left: 0;
   right: 0;
   width: 100%;
-  height: 12px;
+  height: 14px;
   cursor: pointer;
   display: flex;
   align-items: flex-end;
 }
 
 .vjs-modern-theme .vjs-progress-holder {
-  height: 4px;
+  height: 3px;
   border-radius: 2px;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.15);
   margin: 0;
   transition: height 0.2s ease;
 }
 
 .vjs-modern-theme .vjs-progress-control:hover .vjs-progress-holder {
-  height: 8px;
+  height: 6px;
 }
 
 .vjs-modern-theme .vjs-play-progress {
-  background: #e85c5c; /* Accent Blue */
+  background: linear-gradient(90deg, #e85c5c, #ff7a5c);
   border-radius: 2px;
 }
 
 .vjs-modern-theme .vjs-play-progress:before {
-  display: none; /* Hide default knob */
+  display: none;
 }
 
-/* Custom Knob for progress */
 .vjs-modern-theme .vjs-play-progress::after {
   content: '';
   position: absolute;
   right: -6px;
   top: 50%;
   transform: translateY(-50%) scale(0);
-  width: 12px;
-  height: 12px;
+  width: 14px;
+  height: 14px;
   background: #fff;
   border-radius: 50%;
-  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  box-shadow: 0 0 8px rgba(232, 92, 92, 0.5);
   transition: transform 0.2s ease;
 }
 
@@ -112,7 +117,7 @@
 }
 
 .vjs-modern-theme .vjs-load-progress {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 2px;
 }
 
@@ -124,7 +129,7 @@
 }
 
 .vjs-modern-theme .vjs-button:hover > .vjs-icon-placeholder:before {
-  text-shadow: 0 0 8px rgba(255,255,255,0.6);
+  text-shadow: 0 0 12px rgba(255, 255, 255, 0.5);
   transform: scale(1.1);
 }
 
@@ -149,23 +154,23 @@
   opacity: 0.5;
 }
 
-/* Menus (Subtitles, Settings) */
+/* Menus */
 .vjs-modern-theme .vjs-menu-button-popup .vjs-menu {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .vjs-modern-theme .vjs-menu-content {
-  background: rgba(20, 20, 25, 0.9) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-radius: 8px;
+  background: rgba(15, 15, 20, 0.92) !important;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: 12px;
   padding: 8px !important;
-  border: 1px solid rgba(255,255,255,0.1);
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
 }
 
 .vjs-modern-theme .vjs-menu-item {
-  border-radius: 4px;
+  border-radius: 6px;
   margin-bottom: 2px;
   text-transform: capitalize;
   transition: background 0.2s;
@@ -174,12 +179,12 @@
 
 .vjs-modern-theme .vjs-menu-item:hover,
 .vjs-modern-theme .vjs-menu-item:focus {
-  background: rgba(232, 92, 92, 0.4) !important;
+  background: rgba(232, 92, 92, 0.35) !important;
   color: #fff !important;
 }
 
 .vjs-modern-theme .vjs-menu-item.vjs-selected {
-  background: rgba(232, 92, 92, 0.8) !important;
+  background: rgba(232, 92, 92, 0.7) !important;
   font-weight: bold;
 }
 
@@ -193,13 +198,25 @@
 .vjs-modern-theme .vjs-volume-bar.vjs-slider-horizontal {
   height: 4px;
   border-radius: 2px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .vjs-modern-theme .vjs-volume-level {
-  background: #e85c5c;
+  background: linear-gradient(90deg, #e85c5c, #ff7a5c);
   border-radius: 2px;
 }
 
 .vjs-modern-theme .vjs-volume-level:before {
   display: none;
+}
+
+/* Play/pause button specific */
+.vjs-modern-theme .vjs-play-control {
+  order: -1;
+}
+
+/* Poster image subtle zoom */
+.vjs-modern-theme.vjs-has-started .vjs-poster {
+  opacity: 0;
+  transition: opacity 0.5s ease;
 }
