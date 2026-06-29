@@ -120,12 +120,17 @@ export default function HlsPlayer({ src, type = "application/x-mpegURL", poster,
       autoplay,
       controls: false,
       preload: "metadata",
+      width: "100%",
+      height: "100%",
       html5: {
         hls: { overrideNative: true, enableLowInitialPlaylist: true, smoothQualityChange: true },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
       },
     });
+
+    player.el().style.setProperty("width", "100%", "important");
+    player.el().style.setProperty("height", "100%", "important");
 
     player.qualityLevels();
     player.src({ src, type });
