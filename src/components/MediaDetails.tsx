@@ -23,7 +23,7 @@ interface CineProResponse {
   sources: Source[];
 }
 
-const CINEPRO_BASE = import.meta.env.VITE_CINEPRO_URL ?? "http://localhost:3000";
+const CINEPRO_BASE = import.meta.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
 
 function toUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
   if (mediaType === "tv") {
