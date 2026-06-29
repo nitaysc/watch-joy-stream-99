@@ -11,18 +11,9 @@ interface HlsPlayerProps {
   type?: string;
   poster?: string;
   autoplay?: boolean;
-  width?: number | string;
-  height?: number | string;
 }
 
-export default function HlsPlayer({
-  src,
-  type = "application/x-mpegURL",
-  poster,
-  autoplay = false,
-  width = "100%",
-  height = "100%",
-}: HlsPlayerProps) {
+export default function HlsPlayer({ src, type = "application/x-mpegURL", poster, autoplay = false }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,7 +41,6 @@ export default function HlsPlayer({
     return `${m}:${String(sec).padStart(2, "0")}`;
   };
 
-  // Show controls on mouse move, hide after idle
   const handleMouseMove = useCallback(() => {
     setShowControls(true);
     if (playing) {
@@ -59,17 +49,13 @@ export default function HlsPlayer({
     }
   }, [playing]);
 
-  // Progress bar seek
   const handleProgressClick = (e: React.MouseEvent) => {
     const rect = progressRef.current?.getBoundingClientRect();
     if (!rect || !playerRef.current) return;
-    const frac = (e.clientX - rect.left) / rect.width;
-    const time = frac * duration;
-    playerRef.current.currentTime(time);
-    setCurrentTime(time);
+    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    playerRef.current.currentTime(frac * duration);
   };
 
-  // Toggle play/pause
   const togglePlay = () => {
     const p = playerRef.current;
     if (!p) return;
@@ -77,7 +63,6 @@ export default function HlsPlayer({
     else { p.pause(); setPlaying(false); }
   };
 
-  // Toggle mute
   const toggleMute = () => {
     const p = playerRef.current;
     if (!p) return;
@@ -85,7 +70,6 @@ export default function HlsPlayer({
     setMuted(!muted);
   };
 
-  // Fullscreen
   const toggleFullscreen = () => {
     const el = containerRef.current;
     if (!el) return;
@@ -98,11 +82,12 @@ export default function HlsPlayer({
     }
   };
 
-  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const p = playerRef.current;
       if (!p) return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
       switch (e.key) {
         case " ":
         case "k":
@@ -121,19 +106,12 @@ export default function HlsPlayer({
         case "ArrowRight":
           p.currentTime(Math.min(duration || Infinity, (p.currentTime() ?? 0) + 10));
           break;
-        case "ArrowUp":
-          p.volume(Math.min(1, (p.volume() ?? 0.5) + 0.1));
-          break;
-        case "ArrowDown":
-          p.volume(Math.max(0, (p.volume() ?? 0.5) - 0.1));
-          break;
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [duration]);
 
-  // Init Video.js
   useEffect(() => {
     const el = videoRef.current;
     if (!el) return;
@@ -159,33 +137,24 @@ export default function HlsPlayer({
     player.on("playing", () => setLoading(false));
     player.on("error", () => setError(true));
     player.on("loadedmetadata", () => setDuration(player.duration() ?? 0));
-
     player.on("timeupdate", () => {
       setCurrentTime(player.currentTime() ?? 0);
       setDuration(player.duration() ?? 0);
     });
-
     player.on("progress", () => {
       const b = player.buffered();
       if (b.length > 0) setBuffered(b.end(b.length - 1));
     });
-
-    // Track quality levels
     player.on("qualitylevelschange", () => {
       const ql = player.qualityLevels();
-      const current = ql.selectedIndex >= 0 ? ql[ql.selectedIndex] : null;
-      if (current) setQuality(`${current.height}p`);
+      const idx = ql.selectedIndex;
+      if (idx >= 0 && ql[idx]) setQuality(`${ql[idx].height}p`);
     });
 
     playerRef.current = player;
-
-    return () => {
-      player.dispose();
-      playerRef.current = null;
-    };
+    return () => { player.dispose(); playerRef.current = null; };
   }, []);
 
-  // Update source
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
@@ -197,7 +166,6 @@ export default function HlsPlayer({
     }
   }, [src, type]);
 
-  // Fullscreen change listener
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", onChange);
@@ -217,25 +185,23 @@ export default function HlsPlayer({
     >
       {/* Ambient glow */}
       {poster && (
-        <div className="pointer-events-none absolute inset-0 -z-10 opacity-30 transition-opacity duration-700">
-          <img
-            src={poster}
-            alt=""
-            className="h-full w-full scale-150 object-cover blur-3xl"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent" />
+        <div className="pointer-events-none absolute inset-0 opacity-20 transition-opacity duration-700">
+          <img src={poster} alt="" className="h-full w-full scale-150 object-cover blur-3xl" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
         </div>
       )}
 
-      {/* Video element */}
-      <video
-        ref={videoRef}
-        className="video-js vjs-modern-theme h-full w-full"
-        playsInline
-        poster={poster}
-      />
+      {/* Video.js wrapper — must fill container so video fills properly */}
+      <div data-vjs-player className="h-full w-full">
+        <video
+          ref={videoRef}
+          className="video-js vjs-modern-theme h-full w-full"
+          playsInline
+          poster={poster}
+        />
+      </div>
 
-      {/* Loading overlay */}
+      {/* Loading */}
       {loading && !error && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="relative">
@@ -247,7 +213,7 @@ export default function HlsPlayer({
         </div>
       )}
 
-      {/* Error state */}
+      {/* Error */}
       {error && (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
           <div className="rounded-full bg-white/5 p-4 ring-1 ring-white/10">
@@ -257,7 +223,7 @@ export default function HlsPlayer({
         </div>
       )}
 
-      {/* Big play button (centered, shown when paused) */}
+      {/* Big play button */}
       {!playing && !loading && !error && (
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="flex h-20 w-20 items-center justify-center rounded-full bg-primary/90 backdrop-blur-md shadow-2xl shadow-primary/30 ring-1 ring-white/20 transition-all duration-300 hover:scale-110 hover:bg-primary hover:shadow-primary/50">
@@ -266,114 +232,75 @@ export default function HlsPlayer({
         </div>
       )}
 
-      {/* Top progress bar */}
-      <div
-        className={`absolute top-0 left-0 right-0 z-20 h-1 cursor-pointer transition-opacity duration-300 ${
-          showControls ? "opacity-100" : "opacity-0"
-        }`}
-        onClick={(e) => { e.stopPropagation(); handleProgressClick(e); }}
-        ref={progressRef}
-      >
-        {/* Buffered */}
-        <div className="absolute inset-0 rounded-full bg-white/10">
-          <div
-            className="h-full rounded-full bg-white/20 transition-all duration-300"
-            style={{ width: `${bufferedFrac * 100}%` }}
-          />
-        </div>
-        {/* Progress */}
-        <div
-          className="absolute inset-0 rounded-full bg-gradient-to-r from-primary to-orange-500 shadow-lg shadow-primary/30"
-          style={{ width: `${progressFrac * 100}%` }}
-        />
-        {/* Knob */}
-        <div
-          className="absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-white shadow-lg shadow-primary/30 transition-transform duration-150 hover:scale-150"
-          style={{ left: `calc(${progressFrac * 100}% - 7px)` }}
-        />
-      </div>
-
-      {/* Bottom controls */}
+      {/* Bottom overlay - progress bar + controls */}
       <div
         className={`absolute bottom-0 left-0 right-0 z-20 transition-all duration-500 ${
-          showControls
-            ? "translate-y-0 opacity-100"
-            : "translate-y-4 opacity-0 pointer-events-none"
+          showControls ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0 pointer-events-none"
         }`}
       >
-        {/* Now playing info */}
-        <div className="mx-4 mb-16">
-          {poster && (
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-14 overflow-hidden rounded-md ring-1 ring-white/10">
-                <img src={poster} alt="" className="h-full w-full object-cover" />
-              </div>
-              <div className="text-xs text-white/80">
-                <p className="font-medium text-white/90">Now Playing</p>
-                <p className="text-white/40">
-                  {formatTime(currentTime)} / {formatTime(duration)}
-                </p>
-              </div>
+        {/* Progress bar — sits at bottom of video area, above controls */}
+        <div
+          className="mx-3 h-1.5 cursor-pointer rounded-full bg-white/10 transition-all duration-200 hover:h-2.5"
+          onClick={(e) => { e.stopPropagation(); handleProgressClick(e); }}
+          ref={progressRef}
+        >
+          <div className="relative h-full">
+            <div className="h-full rounded-full bg-white/15" style={{ width: `${bufferedFrac * 100}%` }} />
+            <div
+              className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-primary to-orange-500 shadow-lg shadow-primary/30"
+              style={{ width: `${progressFrac * 100}%` }}
+            >
+              <div className="absolute right-0 top-1/2 h-3.5 w-3.5 -translate-y-1/2 translate-x-1/2 rounded-full bg-white shadow-lg shadow-primary/40 opacity-0 transition-opacity duration-200 group-hover:opacity-100 hover:!opacity-100" />
             </div>
-          )}
+          </div>
         </div>
 
         {/* Floating pill control bar */}
-        <div className="mx-3 mb-3">
-          <div className="flex items-center gap-1.5 rounded-2xl bg-black/70 px-2 py-2 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
-            {/* Play/Pause */}
+        <div className="mx-3 mb-3 mt-1.5">
+          <div className="flex items-center gap-0.5 rounded-2xl bg-black/70 px-2 py-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
             <button
               onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/80 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/80 transition-all duration-200 hover:bg-white/10 hover:text-white"
             >
-              {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="h-4 w-4 fill-current ml-0.5" />}
+              {playing ? <Pause className="h-4 w-4 fill-current" /> : <Play className="ml-0.5 h-4 w-4 fill-current" />}
             </button>
 
-            {/* Skip back 10s */}
             <button
               onClick={(e) => { e.stopPropagation(); playerRef.current?.currentTime(Math.max(0, (playerRef.current?.currentTime() ?? 0) - 10)); }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white"
             >
               <SkipBack className="h-3.5 w-3.5" />
             </button>
 
-            {/* Skip forward 10s */}
             <button
               onClick={(e) => { e.stopPropagation(); playerRef.current?.currentTime(Math.min(duration || Infinity, (playerRef.current?.currentTime() ?? 0) + 10)); }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white"
             >
               <SkipForward className="h-3.5 w-3.5" />
             </button>
 
-            {/* Divider */}
-            <div className="mx-1 h-5 w-px bg-white/10" />
-
-            {/* Time */}
-            <span className="min-w-[90px] text-xs font-medium tabular-nums text-white/60">
+            <span className="ml-1 text-xs font-medium tabular-nums text-white/50 min-w-[80px]">
               {formatTime(currentTime)} / {formatTime(duration)}
             </span>
 
-            {/* Spacer */}
             <div className="flex-1" />
 
-            {/* Quality badge */}
+            {/* Quality */}
             <div className="relative">
               <button
                 onClick={(e) => { e.stopPropagation(); setShowQualityMenu(!showQualityMenu); }}
-                className="flex h-7 items-center gap-1 rounded-lg bg-white/5 px-2 text-[10px] font-semibold tracking-wide text-white/60 uppercase transition-all duration-200 hover:bg-white/10 hover:text-white"
+                className="flex h-7 items-center rounded-lg bg-white/5 px-2 text-[10px] font-semibold tracking-wider text-white/50 uppercase transition-all duration-200 hover:bg-white/10 hover:text-white"
               >
                 {quality}
               </button>
               {showQualityMenu && (
-                <div className="absolute bottom-full right-0 mb-2 min-w-[120px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
+                <div className="absolute bottom-full right-0 mb-2 min-w-[110px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
                   {["Auto", "2160p", "1080p", "720p", "480p", "360p"].map((q) => (
                     <button
                       key={q}
                       onClick={(e) => { e.stopPropagation(); setQuality(q); setShowQualityMenu(false); }}
                       className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
-                        quality === q
-                          ? "bg-primary/20 text-primary font-medium"
-                          : "text-white/60 hover:bg-white/5 hover:text-white"
+                        quality === q ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                     >
                       {q}
@@ -391,7 +318,7 @@ export default function HlsPlayer({
             >
               <button
                 onClick={(e) => { e.stopPropagation(); toggleMute(); }}
-                className="flex h-8 w-8 items-center justify-center rounded-xl text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white"
+                className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white"
               >
                 {muted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
@@ -404,19 +331,15 @@ export default function HlsPlayer({
                     step={0.01}
                     defaultValue={0.7}
                     onChange={(e) => { playerRef.current?.volume(parseFloat(e.target.value)); setMuted(false); }}
-                    className="h-16 w-1 origin-center -rotate-180 appearance-none rounded-full bg-white/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-primary/30"
-                    style={{
-                      background: `linear-gradient(to top, #e85c5c ${(playerRef.current?.volume() ?? 0.7) * 100}%, rgba(255,255,255,0.1) ${(playerRef.current?.volume() ?? 0.7) * 100}%)`,
-                    }}
+                    className="h-16 w-1 origin-center appearance-none rounded-full bg-white/10 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:shadow-primary/30"
                   />
                 </div>
               )}
             </div>
 
-            {/* Fullscreen */}
             <button
               onClick={(e) => { e.stopPropagation(); toggleFullscreen(); }}
-              className="flex h-8 w-8 items-center justify-center rounded-xl text-white/50 transition-all duration-200 hover:bg-white/10 hover:text-white"
+              className="flex h-9 w-9 items-center justify-center rounded-xl text-white/40 transition-all duration-200 hover:bg-white/10 hover:text-white"
             >
               {fullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </button>
