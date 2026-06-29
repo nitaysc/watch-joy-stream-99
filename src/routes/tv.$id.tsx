@@ -5,6 +5,7 @@ import { getTv, getSeason } from "@/lib/tmdb.functions";
 import { Star, Calendar, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { CustomPlayer } from "@/components/ui/custom-player";
 
 const tvQuery = (id: number, language: string) =>
   queryOptions({ queryKey: ["tv", id, language], queryFn: () => getTv({ data: { id, language } }) });
@@ -40,20 +41,11 @@ function TvPage() {
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
-  const src = `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true`;
-
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
       <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border shadow-glow relative">
         <div className="aspect-video w-full">
-          <iframe
-            key={src}
-            src={src}
-            className="h-full w-full"
-            allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-            referrerPolicy="no-referrer"
-            allowFullScreen
-          />
+          <CustomPlayer tmdbId={tvId} type="tv" />
         </div>
       </div>
 
