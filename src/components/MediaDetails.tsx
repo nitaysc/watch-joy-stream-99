@@ -99,38 +99,46 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
     <div className="mx-auto w-full max-w-5xl">
       {/* Error */}
       {error && (
-        <div className="mb-3 flex items-center gap-3 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-          <span className="flex-1">{error}</span>
-          <button
-            onClick={fetchStreams}
-            className="flex items-center gap-1.5 rounded-md bg-red-500/20 px-3 py-1 text-xs font-medium hover:bg-red-500/30"
-          >
-            <RefreshCw className="h-3 w-3" /> Retry
-          </button>
+        <div className="mb-4 animate-fade-in">
+          <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 backdrop-blur-sm">
+            <span className="flex-1">{error}</span>
+            <button
+              onClick={fetchStreams}
+              className="flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium transition hover:bg-red-500/30"
+            >
+              <RefreshCw className="h-3 w-3" /> Retry
+            </button>
+          </div>
         </div>
       )}
 
       {/* Server bar */}
       {streamUrl && sources.length > 1 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-3 flex flex-wrap gap-2" style={{ animationDelay: "0.1s" }}>
           {sources.map((s, i) => (
             <button
               key={i}
               onClick={() => switchSource(i)}
-              className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+              className={`group flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-medium transition-all duration-300 ${
                 i === activeIdx
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "bg-white/10 text-white/70 hover:bg-white/20 hover:text-white"
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/30 ring-1 ring-primary/50"
+                  : "bg-white/[0.04] text-white/60 ring-1 ring-white/10 hover:bg-white/10 hover:text-white hover:ring-white/20"
               }`}
             >
-              {s.provider?.name ?? "Server"} {s.quality}
+              {s.provider?.name ?? "Server"}
+              <span className={`${i === activeIdx ? "text-primary-foreground/70" : "text-white/30"} font-normal`}>
+                {s.quality}
+              </span>
+              {i === activeIdx && (
+                <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-primary-foreground/60 animate-pulse" />
+              )}
             </button>
           ))}
         </div>
       )}
 
       {/* Player area */}
-      <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
+      <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
           <div className="aspect-video w-full">
             <HlsPlayer
@@ -145,17 +153,28 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
             />
           </div>
         ) : (
-          <div className="flex aspect-video items-center justify-center">
+          <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.01]">
             {isLoading ? (
-              <div className="flex flex-col items-center gap-3">
-                <svg className="h-8 w-8 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
-                  <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                <span className="text-sm text-white/60">Loading stream...</span>
+              <div className="flex flex-col items-center gap-4">
+                <div className="relative flex h-10 w-10 items-center justify-center">
+                  <svg className="h-10 w-10 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.15" />
+                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <div className="absolute h-3 w-3 rounded-full bg-primary animate-pulse" />
+                </div>
+                <span className="text-sm text-white/40">Finding streams...</span>
               </div>
             ) : (
-              <span className="text-sm text-white/40">No streams available</span>
+              <div className="flex flex-col items-center gap-2">
+                <span className="text-sm text-white/30">No streams available</span>
+                <button
+                  onClick={fetchStreams}
+                  className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/40 ring-1 ring-white/10 hover:bg-white/10 hover:text-white/60"
+                >
+                  <RefreshCw className="h-3 w-3" /> Try again
+                </button>
+              </div>
             )}
           </div>
         )}
