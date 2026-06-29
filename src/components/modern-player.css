@@ -1,17 +1,34 @@
-﻿/* modern-player.css — Custom overlay skin for Video.js
-   Default controls are hidden; all UI is rendered by HlsPlayer.tsx overlay */
+﻿/* modern-player.css — Custom overlay skin for Video.js */
 
+/* Force Video.js container and tech to fill parent */
 .vjs-modern-theme.video-js {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
   font-family: inherit;
   color: #fff;
+}
+
+.vjs-modern-theme .vjs-tech {
+  position: absolute !important;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+[data-vjs-player] {
+  position: relative;
+  width: 100%;
+  height: 100%;
 }
 
 /* Hide ALL default Video.js controls — we use our custom overlay */
 .vjs-modern-theme .vjs-control-bar,
 .vjs-modern-theme .vjs-big-play-button,
 .vjs-modern-theme .vjs-loading-spinner,
-.vjs-modern-theme .vjs-poster,
-.vjs-modern-theme .vjs-text-track-display,
 .vjs-modern-theme .vjs-modal-dialog,
 .vjs-modern-theme .vjs-error-display,
 .vjs-modern-theme .vjs-control,
@@ -30,23 +47,26 @@
   transition: opacity 0.5s ease;
 }
 
-/* Hide the "No compatible source" text */
+/* Hide text track display and no-source messages */
+.vjs-modern-theme .vjs-text-track-display {
+  display: none !important;
+}
+
 .vjs-modern-theme .vjs-error .vjs-error-display .vjs-modal-dialog-content {
   display: none;
 }
 
-/* Tech loader */
 .vjs-modern-theme.vjs-waiting .vjs-loading-spinner {
   display: none !important;
 }
 
-/* Smooth poster fade when video starts */
+/* Video element fill */
 .vjs-modern-theme video {
   object-fit: contain;
   background: transparent;
 }
 
-/* Subtle fullscreen adjustments */
+/* Fullscreen adjustments */
 .vjs-modern-theme.video-js:-webkit-full-screen {
   border-radius: 0;
 }
