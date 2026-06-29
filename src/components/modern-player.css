@@ -16,7 +16,7 @@
   line-height: 80px;
   border-radius: 50%;
   border: none;
-  background-color: rgba(25, 118, 210, 0.8); /* Accent Blue */
+  background-color: rgba(232, 92, 92, 0.8); /* Accent Blue */
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   position: absolute;
@@ -28,7 +28,7 @@
 }
 
 .vjs-modern-theme:hover .vjs-big-play-button {
-  background-color: rgba(25, 118, 210, 1);
+  background-color: rgba(232, 92, 92, 1);
   transform: translate(-50%, -50%) scale(1.1);
 }
 
@@ -84,7 +84,7 @@
 }
 
 .vjs-modern-theme .vjs-play-progress {
-  background: #1976d2; /* Accent Blue */
+  background: #e85c5c; /* Accent Blue */
   border-radius: 2px;
 }
 
@@ -174,12 +174,12 @@
 
 .vjs-modern-theme .vjs-menu-item:hover,
 .vjs-modern-theme .vjs-menu-item:focus {
-  background: rgba(25, 118, 210, 0.4) !important;
+  background: rgba(232, 92, 92, 0.4) !important;
   color: #fff !important;
 }
 
 .vjs-modern-theme .vjs-menu-item.vjs-selected {
-  background: rgba(25, 118, 210, 0.8) !important;
+  background: rgba(232, 92, 92, 0.8) !important;
   font-weight: bold;
 }
 
@@ -196,7 +196,7 @@
 }
 
 .vjs-modern-theme .vjs-volume-level {
-  background: #1976d2;
+  background: #e85c5c;
   border-radius: 2px;
 }
 
