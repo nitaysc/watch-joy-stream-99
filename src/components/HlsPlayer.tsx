@@ -14,6 +14,7 @@ export interface ServerSource {
   type?: string;
   quality?: string;
   provider?: { name: string };
+  requestHeaders?: Record<string, string>;
 }
 
 interface HlsPlayerProps {
@@ -53,6 +54,7 @@ export default function HlsPlayer({
   const progressRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
   const menuOpenRef = useRef(false);
+  const headersRef = useRef<Record<string, string> | undefined>();
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.7);
@@ -227,7 +229,22 @@ export default function HlsPlayer({
       width: "100%",
       height: "100%",
       html5: {
-        hls: { overrideNative: true, enableLowInitialPlaylist: true, smoothQualityChange: true },
+        hls: {
+          overrideNative: true,
+          enableLowInitialPlaylist: true,
+          smoothQualityChange: true,
+          beforeRequest: (req: any) => {
+            const h = headersRef.current;
+            if (h) {
+              for (const key of Object.keys(h)) {
+                if (key.toLowerCase() !== "user-agent" && h[key]) {
+                  req.headers = req.headers || {};
+                  req.headers[key] = h[key];
+                }
+              }
+            }
+          },
+        },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
       },
@@ -320,6 +337,7 @@ export default function HlsPlayer({
   const hasAudioTracks = audioTracks.length > 0;
 
   const activeSource = sources[activeSourceIdx];
+  headersRef.current = activeSource?.requestHeaders;
 
   return (
     <div

@@ -17,6 +17,7 @@ interface Source {
   quality: string;
   provider?: { name: string };
   audioTracks?: { language: string; label: string }[];
+  requestHeaders?: Record<string, string>;
 }
 
 interface CacheEntry {
@@ -87,6 +88,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       type: s.type,
       quality: s.quality,
       provider: s.provider,
+      requestHeaders: s.requestHeaders,
     }));
     setSources(mapped);
     if (mapped.length > 0) {
