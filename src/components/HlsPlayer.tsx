@@ -247,7 +247,25 @@ export default function HlsPlayer({
       setLoading(false);
       onError?.();
     });
-    player.on("loadedmetadata", () => { setDuration(player.duration() ?? 0); updateTracks(); refreshQualityLevels(); });
+    player.on("loadedmetadata", () => {
+      setDuration(player.duration() ?? 0);
+      updateTracks();
+      refreshQualityLevels();
+      // Auto-select English audio track
+      const at = player.audioTracks?.();
+      if (at) {
+        for (let i = 0; i < at.length; i++) {
+          if (at[i].language === "eng" || at[i].label?.toLowerCase().includes("english")) {
+            at[i].enabled = true;
+            break;
+          }
+        }
+        // If no English found, enable the first track
+        if (at.length > 0 && !Array.from(at).some((t: any) => t.enabled)) {
+          at[0].enabled = true;
+        }
+      }
+    });
     player.on("timeupdate", () => {
       setCurrentTime(player.currentTime() ?? 0);
       setDuration(player.duration() ?? 0);

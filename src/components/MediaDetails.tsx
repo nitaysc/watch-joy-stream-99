@@ -50,27 +50,35 @@ function setCache(key: string, data: Source[], expiresAt: string) {
   } catch { /* quota exceeded */ }
 }
 
-// Known slow providers to deprioritize
-const SLOW_PROVIDERS = new Set(["VidAPI", "Vidcloud", "Gogo", "VidSrc"]);
+// Provider priority: fastest/most reliable first
+const PROVIDER_PRIORITY: Record<string, number> = {
+  VixSrc: 5,
+  VidRock: 4,
+  Icefy: 3,
+  UpCloud: 2,
+  MixDrop: 2,
+  Filemoon: 2,
+};
+// Providers NOT in the map get priority 0
+// Known slow providers get negative priority
+const SLOW_PROVIDERS = new Set(["VidApi", "Vidcloud", "Gogo", "VidSrc"]);
 
-const SLOW_QUALITY_PENALTY = 100000; // massive penalty so slow providers always sort last
-
-function providerRank(name: string | undefined): number {
-  if (!name) return 0;
-  // Known-fast providers get highest priority
-  if (name === "UpCloud") return 3;
-  if (name === "MixDrop") return 2;
-  if (name === "Filemoon") return 2;
-  // Slow providers get pushed to bottom
+function sourcePriority(s: Source): number {
+  const name = s.provider?.name ?? "";
+  if (PROVIDER_PRIORITY[name] !== undefined) return PROVIDER_PRIORITY[name];
   if (SLOW_PROVIDERS.has(name)) return -1;
   return 0;
 }
 
 function sortSources(a: Source, b: Source): number {
-  const pa = providerRank(a.provider?.name);
-  const pb = providerRank(b.provider?.name);
-  if (pa !== pb) return pb - pa; // known-fast first
-  // Within same tier, higher quality first
+  const pa = sourcePriority(a);
+  const pb = sourcePriority(b);
+  if (pa !== pb) return pb - pa;
+  // Same tier: prefer English audio
+  const aEng = a.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
+  const bEng = b.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
+  if (aEng !== bEng) return bEng - aEng;
+  // Then higher quality
   const qa = parseInt(a.quality, 10);
   const qb = parseInt(b.quality, 10);
   return (isNaN(qb) ? 0 : qb) - (isNaN(qa) ? 0 : qa);
