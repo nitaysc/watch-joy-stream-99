@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
-import { Star, Calendar, ChevronDown, Server } from "lucide-react";
+import { Star, Calendar, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 
@@ -40,16 +40,7 @@ function TvPage() {
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
-  const [serverIndex, setServerIndex] = useState(tvId === 37854 ? 1 : 0);
-
-  const servers = [
-    { name: "VidKing", url: `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true` },
-    { name: "EmbedSU", url: `https://embed.su/embed/tv/${tvId}/${season}/${episode}` },
-    { name: "VidSrc", url: `https://vidsrc.cc/v2/embed/tv/${tvId}/${season}/${episode}` },
-    { name: "VidLink", url: `https://vidlink.pro/tv/${tvId}/${season}/${episode}?primaryColor=e85c5c&autoplay=1&next=1` },
-  ];
-
-  const src = servers[serverIndex].url;
+  const src = `https://vidlink.pro/tv/${tvId}/${season}/${episode}?primaryColor=e85c5c&autoplay=1&next=1`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -80,28 +71,6 @@ function TvPage() {
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
         <span className="text-sm text-muted-foreground">{t("Now playing")}: {t("S")}{season} · {t("E")}{episode}</span>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2">
-        <div className="flex items-center gap-1 overflow-x-auto bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-          <span className="text-sm font-semibold text-muted-foreground pl-3 pr-2 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-            <Server className="h-3.5 w-3.5" />
-          </span>
-          <div className="w-[1px] h-4 bg-border/50 mr-1" />
-          {servers.map((s, i) => (
-            <button
-              key={s.name}
-              onClick={() => setServerIndex(i)}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                serverIndex === i 
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                  : "text-muted-foreground hover:bg-background/80 hover:text-foreground"
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
-        </div>
       </div>
 
       <section className="mt-6">

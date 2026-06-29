@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getMovie } from "@/lib/tmdb.functions";
-import { useState } from "react";
-import { Star, Clock, Calendar, Server } from "lucide-react";
+import { Star, Clock, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 
@@ -27,16 +26,7 @@ function MoviePage() {
   const { id } = Route.useParams();
   const { t, i18n } = useTranslation();
   const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
-  const [serverIndex, setServerIndex] = useState(0);
-
-  const servers = [
-    { name: "VidKing", url: `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true` },
-    { name: "VidLink", url: `https://vidlink.pro/movie/${id}?primaryColor=e85c5c&autoplay=1` },
-    { name: "EmbedSU", url: `https://embed.su/embed/movie/${id}` },
-    { name: "VidSrc", url: `https://vidsrc.cc/v2/embed/movie/${id}` },
-  ];
-
-  const src = servers[serverIndex].url;
+  const src = `https://vidlink.pro/movie/${id}?primaryColor=e85c5c&autoplay=1`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -49,28 +39,6 @@ function MoviePage() {
             referrerPolicy="no-referrer"
             allowFullScreen
           />
-        </div>
-      </div>
-
-      <div className="mt-4 flex flex-col gap-2">
-        <div className="flex items-center gap-1 overflow-x-auto bg-muted/40 p-1.5 rounded-xl w-fit border border-border/50">
-          <span className="text-sm font-semibold text-muted-foreground pl-3 pr-2 flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
-            <Server className="h-3.5 w-3.5" />
-          </span>
-          <div className="w-[1px] h-4 bg-border/50 mr-1" />
-          {servers.map((s, i) => (
-            <button
-              key={s.name}
-              onClick={() => setServerIndex(i)}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all whitespace-nowrap ${
-                serverIndex === i 
-                  ? "bg-primary text-primary-foreground shadow-md shadow-primary/20" 
-                  : "text-muted-foreground hover:bg-background/80 hover:text-foreground"
-              }`}
-            >
-              {s.name}
-            </button>
-          ))}
         </div>
       </div>
 
