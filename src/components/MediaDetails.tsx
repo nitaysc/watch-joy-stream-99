@@ -17,7 +17,6 @@ interface Source {
   quality: string;
   provider?: { name: string };
   audioTracks?: { language: string; label: string }[];
-  requestHeaders?: Record<string, string>;
 }
 
 interface CacheEntry {
@@ -51,20 +50,20 @@ function setCache(key: string, data: Source[], expiresAt: string) {
   } catch { /* quota exceeded */ }
 }
 
-// Provider priority (higher = preferred)
+// Provider priority (lower = preferred)
 const PROVIDER_PRIORITY: Record<string, number> = {
-  VixSrc: 5,
-  VidRock: 4,
-  Icefy: 3,
-  UpCloud: 2,
-  MixDrop: 2,
-  Filemoon: 2,
+  Icefy: 1,
+  VidRock: 2,
+  MixDrop: 3,
+  UpCloud: 4,
+  Filemoon: 5,
+  VixSrc: 6,
 };
 
 function sortSources(a: Source, b: Source): number {
-  const pa = PROVIDER_PRIORITY[a.provider?.name ?? ""] ?? 0;
-  const pb = PROVIDER_PRIORITY[b.provider?.name ?? ""] ?? 0;
-  if (pa !== pb) return pb - pa;
+  const pa = PROVIDER_PRIORITY[a.provider?.name ?? ""] ?? 99;
+  const pb = PROVIDER_PRIORITY[b.provider?.name ?? ""] ?? 99;
+  if (pa !== pb) return pa - pb;
   const aEng = a.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
   const bEng = b.audioTracks?.some((t) => t.language === "eng") ? 1 : 0;
   if (aEng !== bEng) return bEng - aEng;
@@ -88,7 +87,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       type: s.type,
       quality: s.quality,
       provider: s.provider,
-      requestHeaders: s.requestHeaders,
     }));
     setSources(mapped);
     if (mapped.length > 0) {

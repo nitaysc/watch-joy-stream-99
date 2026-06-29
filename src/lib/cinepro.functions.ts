@@ -6,8 +6,6 @@ interface Source {
   quality: string;
   provider?: { name: string };
   audioTracks?: { language: string; label: string }[];
-  directUrl?: string;
-  requestHeaders?: Record<string, string>;
 }
 
 interface CineProResponse {
@@ -28,6 +26,21 @@ function extractDirectInfo(proxyUrl: string): { directUrl: string; headers: Reco
   } catch {
     return null;
   }
+}
+
+// Override source URL to always use CinePro proxy (relative paths in HLS playlists require it)
+function ensureProxyUrl(sourceUrl: string, cineproBase: string): string {
+  const direct = extractDirectInfo(sourceUrl);
+  // If it already looks like a proxy URL, rewrite localhost to the CinePro base
+  if (sourceUrl.includes("/v1/proxy")) {
+    return sourceUrl.replace(/http:\/\/localhost:\d+/, cineproBase);
+  }
+  // If it's a direct URL (extracted), re-wrap it through the proxy
+  if (direct) {
+    const encoded = encodeURIComponent(JSON.stringify({ url: direct.directUrl, headers: direct.headers }));
+    return `${cineproBase}/v1/proxy?data=${encoded}`;
+  }
+  return sourceUrl;
 }
 
 async function fetchWithTimeout(url: string, timeoutMs: number): Promise<Response> {
@@ -97,16 +110,12 @@ export const getStreams = createServerFn({ method: "GET" })
       json = await res.json();
     }
 
-    // Decode proxy URLs to extract direct URLs + headers
+    // Ensure all source URLs go through CinePro proxy (HLS playlists contain relative paths)
     if (json.sources) {
-      json.sources = json.sources.map((s) => {
-        const direct = extractDirectInfo(s.url);
-        return {
-          ...s,
-          url: direct?.directUrl ?? s.url,
-          requestHeaders: direct?.headers,
-        };
-      });
+      json.sources = json.sources.map((s) => ({
+        ...s,
+        url: ensureProxyUrl(s.url, CINEPRO_BASE),
+      }));
     }
 
     try {
