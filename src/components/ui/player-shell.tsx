@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Monitor, Subtitles, Maximize2 } from "lucide-react";
+import { Monitor } from "lucide-react";
 
 type Server = {
   id: string;
@@ -20,14 +20,14 @@ const MOVIE_SERVERS: Server[] = [
       `https://vidlink.pro/movie/${id}?primaryColor=e85c5c&autoplay=1`,
   },
   {
-    id: "vidsrc",
+    id: "multiembed",
     name: "Hydra",
-    getUrl: (id) => `https://vidsrc.cc/v2/embed/movie/${id}`,
+    getUrl: (id) => `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1`,
   },
   {
-    id: "autoembed",
+    id: "2embed",
     name: "Flux",
-    getUrl: (id) => `https://player.autoembed.cc/embed/movie/${id}`,
+    getUrl: (id) => `https://www.2embed.cc/embed/${id}`,
   },
 ];
 
@@ -44,15 +44,15 @@ const TV_SERVERS: Server[] = [
       `https://vidlink.pro/tv/${id}/${s}/${e}?primaryColor=e85c5c&autoplay=1&next=1`,
   },
   {
-    id: "vidsrc",
+    id: "multiembed",
     name: "Hydra",
-    getUrl: (id, s, e) => `https://vidsrc.cc/v2/embed/tv/${id}/${s}/${e}`,
+    getUrl: (id, s, e) =>
+      `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1&s=${s}&e=${e}`,
   },
   {
-    id: "autoembed",
+    id: "2embed",
     name: "Flux",
-    getUrl: (id, s, e) =>
-      `https://player.autoembed.cc/embed/tv/${id}/${s}/${e}`,
+    getUrl: (id, s, e) => `https://www.2embed.cc/embedtv/${id}&s=${s}&e=${e}`,
   },
 ];
 
@@ -87,10 +87,6 @@ export function PlayerShell({
             {title ?? "Now Playing"}
           </span>
         </div>
-        <div className="flex items-center gap-1 text-white/40">
-          <Subtitles className="h-3.5 w-3.5" />
-          <Maximize2 className="h-3.5 w-3.5" />
-        </div>
       </div>
 
       {/* ─── Video iframe ─── */}
@@ -100,8 +96,8 @@ export function PlayerShell({
           src={src}
           className="h-full w-full"
           allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-          referrerPolicy="no-referrer"
           allowFullScreen
+          style={{ border: "none" }}
         />
       </div>
 
