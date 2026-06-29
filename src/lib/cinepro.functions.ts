@@ -37,7 +37,7 @@ export const getStreams = createServerFn({ method: "GET" })
   }) => d)
   .handler(async ({ data }) => {
     const CINEPRO_BASE = process.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
-    const url = mediaType === "tv"
+    const url = data.mediaType === "tv"
       ? `${CINEPRO_BASE}/v1/tv/${data.id}/seasons/${data.season ?? "1"}/episodes/${data.episode ?? "1"}`
       : `${CINEPRO_BASE}/v1/movies/${data.id}`;
 
