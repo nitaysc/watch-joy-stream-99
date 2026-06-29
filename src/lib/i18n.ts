@@ -41,7 +41,8 @@ const resources = {
       "Loading episodes...": "Loading episodes...",
       "No image": "No image",
       "Movie": "Movie",
-      "TV Series": "TV Series"
+      "TV Series": "TV Series",
+      "Servers": "Servers"
     }
   },
   he: {
@@ -83,7 +84,8 @@ const resources = {
       "Loading episodes...": "טוען פרקים...",
       "No image": "אין תמונה",
       "Movie": "סרט",
-      "TV Series": "סדרה"
+      "TV Series": "סדרה",
+      "Servers": "שרתים"
     }
   },
   ru: {
@@ -125,7 +127,8 @@ const resources = {
       "Loading episodes...": "Загрузка эпизодов...",
       "No image": "Нет изображения",
       "Movie": "Фильм",
-      "TV Series": "Сериал"
+      "TV Series": "Сериал",
+      "Servers": "Серверы"
     }
   }
 };

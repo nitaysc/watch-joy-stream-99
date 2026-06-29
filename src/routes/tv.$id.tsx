@@ -2,9 +2,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
-import { Star, Calendar, ChevronDown } from "lucide-react";
+import { Star, Calendar, ChevronDown, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { Button } from "@/components/ui/button";
 
 const tvQuery = (id: number, language: string) =>
   queryOptions({ queryKey: ["tv", id, language], queryFn: () => getTv({ data: { id, language } }) });
@@ -40,7 +41,14 @@ function TvPage() {
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
-  const src = `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true`;
+  const servers = [
+    { name: "VidKing", url: `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true` },
+    { name: "VidSrc", url: `https://vidsrc.xyz/embed/tv/${tvId}/${season}/${episode}` },
+    { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${tvId}&tmdb=1&s=${season}&e=${episode}` },
+  ];
+  const [serverIndex, setServerIndex] = useState(0);
+
+  const src = servers[serverIndex].url;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -71,6 +79,25 @@ function TvPage() {
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
         <span className="text-sm text-muted-foreground">{t("Now playing")}: {t("S")}{season} · {t("E")}{episode}</span>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          <Server className="h-4 w-4" /> {t("Servers")}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {servers.map((s, i) => (
+            <Button
+              key={s.name}
+              variant={serverIndex === i ? "default" : "outline"}
+              size="sm"
+              onClick={() => setServerIndex(i)}
+              className="rounded-full"
+            >
+              {s.name}
+            </Button>
+          ))}
+        </div>
       </div>
 
       <section className="mt-6">

@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getMovie } from "@/lib/tmdb.functions";
-import { Star, Clock, Calendar } from "lucide-react";
+import { Star, Clock, Calendar, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
 
 const movieQuery = (id: number, language: string) =>
   queryOptions({ queryKey: ["movie", id, language], queryFn: () => getMovie({ data: { id, language } }) });
@@ -26,7 +28,15 @@ function MoviePage() {
   const { id } = Route.useParams();
   const { t, i18n } = useTranslation();
   const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
-  const src = `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true`;
+  
+  const servers = [
+    { name: "VidKing", url: `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true` },
+    { name: "VidSrc", url: `https://vidsrc.xyz/embed/movie/${id}` },
+    { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${id}&tmdb=1` },
+  ];
+  const [serverIndex, setServerIndex] = useState(0);
+
+  const src = servers[serverIndex].url;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
@@ -39,6 +49,25 @@ function MoviePage() {
             referrerPolicy="no-referrer"
             allowFullScreen
           />
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-col gap-2">
+        <span className="text-sm font-medium text-muted-foreground flex items-center gap-1">
+          <Server className="h-4 w-4" /> {t("Servers")}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {servers.map((s, i) => (
+            <Button
+              key={s.name}
+              variant={serverIndex === i ? "default" : "outline"}
+              size="sm"
+              onClick={() => setServerIndex(i)}
+              className="rounded-full"
+            >
+              {s.name}
+            </Button>
+          ))}
         </div>
       </div>
 
