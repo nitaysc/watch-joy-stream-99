@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import HlsPlayer from "@/components/HlsPlayer";
 
@@ -23,7 +23,38 @@ interface CineProResponse {
   sources: Source[];
 }
 
+interface CacheEntry {
+  data: Source[];
+  expiresAt: number;
+}
+
 const CINEPRO_BASE = import.meta.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
+
+function cacheKey(id: string | number, mediaType: string, season?: string, episode?: string): string {
+  return `cinepro:${mediaType}:${id}:${season ?? "1"}:${episode ?? "1"}`;
+}
+
+function getCache(key: string): Source[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const entry: CacheEntry = JSON.parse(raw);
+    if (Date.now() > entry.expiresAt) {
+      localStorage.removeItem(key);
+      return null;
+    }
+    return entry.data;
+  } catch {
+    return null;
+  }
+}
+
+function setCache(key: string, data: Source[], expiresAt: string) {
+  try {
+    const entry: CacheEntry = { data, expiresAt: new Date(expiresAt).getTime() };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch { /* quota exceeded, ignore */ }
+}
 
 function toUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
   if (mediaType === "tv") {
@@ -44,6 +75,12 @@ function qualityRank(q: string): number {
   return isNaN(n) ? 0 : n;
 }
 
+function processSources(data: CineProResponse): Source[] {
+  return [...data.sources]
+    .map((s) => ({ ...s, url: fixSourceUrl(s.url, CINEPRO_BASE) }))
+    .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
+}
+
 export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
@@ -51,38 +88,47 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   const [error, setError] = useState<string | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
+  const fetchId = useRef(0);
+
+  const applySources = (sorted: Source[]) => {
+    setSources(sorted);
+    setStreamUrl(sorted[0].url);
+    setStreamType(sorted[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+  };
 
   const fetchStreams = () => {
-    let cancelled = false;
-    setIsLoading(true);
-    setError(null);
-    setStreamUrl(null);
-
+    const currentId = ++fetchId.current;
     const url = toUrl(id, mediaType, season, episode);
+    const key = cacheKey(id, mediaType, season, episode);
+
+    // Try cache first — instant load if available
+    const cached = getCache(key);
+    if (cached && currentId === fetchId.current) {
+      applySources(cached);
+      setIsLoading(false);
+    }
+
+    setIsLoading(true);
+
     fetch(url)
       .then((r) => {
         if (!r.ok) throw new Error(`CinePro returned ${r.status}`);
         return r.json() as Promise<CineProResponse>;
       })
       .then((data) => {
-        if (cancelled) return;
+        if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        const sorted = [...data.sources]
-          .map((s) => ({ ...s, url: fixSourceUrl(s.url, CINEPRO_BASE) }))
-          .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
-        setSources(sorted);
-        setStreamUrl(sorted[0].url);
-        setStreamType(sorted[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+        const sorted = processSources(data);
+        setCache(key, sorted, data.expiresAt);
+        applySources(sorted);
       })
       .catch((err) => {
-        if (cancelled) return;
-        setError(err.message);
+        if (currentId !== fetchId.current) return;
+        if (!cached) setError(err.message);
       })
       .finally(() => {
-        if (!cancelled) setIsLoading(false);
+        if (currentId === fetchId.current) setIsLoading(false);
       });
-
-    return () => { cancelled = true; };
   };
 
   useEffect(fetchStreams, [id, mediaType, season, episode]);
