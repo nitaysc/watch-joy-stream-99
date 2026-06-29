@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import HlsPlayer from "@/components/HlsPlayer";
+import { getStreams } from "@/lib/cinepro.functions";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -15,20 +16,13 @@ interface Source {
   type: string;
   quality: string;
   provider?: { name: string };
-}
-
-interface CineProResponse {
-  responseId: string;
-  expiresAt: string;
-  sources: Source[];
+  audioTracks?: { language: string; label: string }[];
 }
 
 interface CacheEntry {
   data: Source[];
   expiresAt: number;
 }
-
-const CINEPRO_BASE = import.meta.env.VITE_CINEPRO_URL ?? "https://core-production-ef8a.up.railway.app";
 
 function cacheKey(id: string | number, mediaType: string, season?: string, episode?: string): string {
   return `cinepro:${mediaType}:${id}:${season ?? "1"}:${episode ?? "1"}`;
@@ -53,32 +47,12 @@ function setCache(key: string, data: Source[], expiresAt: string) {
   try {
     const entry: CacheEntry = { data, expiresAt: new Date(expiresAt).getTime() };
     localStorage.setItem(key, JSON.stringify(entry));
-  } catch { /* quota exceeded, ignore */ }
-}
-
-function toUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
-  if (mediaType === "tv") {
-    return `${CINEPRO_BASE}/v1/tv/${id}/seasons/${season ?? "1"}/episodes/${episode ?? "1"}`;
-  }
-  return `${CINEPRO_BASE}/v1/movies/${id}`;
-}
-
-function fixSourceUrl(url: string, base: string): string {
-  if (url.startsWith("http://localhost:3000")) {
-    return url.replace("http://localhost:3000", base);
-  }
-  return url;
+  } catch { /* quota exceeded */ }
 }
 
 function qualityRank(q: string): number {
   const n = parseInt(q, 10);
   return isNaN(n) ? 0 : n;
-}
-
-function processSources(data: CineProResponse): Source[] {
-  return [...data.sources]
-    .map((s) => ({ ...s, url: fixSourceUrl(s.url, CINEPRO_BASE) }))
-    .sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
 }
 
 export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
@@ -98,10 +72,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
 
   const fetchStreams = () => {
     const currentId = ++fetchId.current;
-    const url = toUrl(id, mediaType, season, episode);
     const key = cacheKey(id, mediaType, season, episode);
 
-    // Try cache first — instant load if available
+    // LocalStorage cache for instant repeat views
     const cached = getCache(key);
     if (cached && currentId === fetchId.current) {
       applySources(cached);
@@ -110,21 +83,17 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
 
     setIsLoading(true);
 
-    fetch(url)
-      .then((r) => {
-        if (!r.ok) throw new Error(`CinePro returned ${r.status}`);
-        return r.json() as Promise<CineProResponse>;
-      })
+    getStreams({ data: { id, mediaType, season, episode } })
       .then((data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
-        const sorted = processSources(data);
+        const sorted = [...data.sources].sort((a, b) => qualityRank(b.quality) - qualityRank(a.quality));
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
       })
       .catch((err) => {
         if (currentId !== fetchId.current) return;
-        if (!cached) setError(err.message);
+        setError(err.message);
       })
       .finally(() => {
         if (currentId === fetchId.current) setIsLoading(false);
@@ -138,8 +107,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
     setStreamUrl(sources[idx].url);
     setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
   };
-
-  const activeSource = sources[activeIdx];
 
   return (
     <div className="mx-auto w-full max-w-5xl">
@@ -160,7 +127,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
 
       {/* Server bar */}
       {streamUrl && sources.length > 1 && (
-        <div className="mb-3 flex flex-wrap gap-2" style={{ animationDelay: "0.1s" }}>
+        <div className="mb-3 flex flex-wrap gap-2 animate-fade-in">
           {sources.map((s, i) => (
             <button
               key={i}
@@ -183,7 +150,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         </div>
       )}
 
-      {/* Player area */}
+      {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
           <div className="aspect-video w-full">
