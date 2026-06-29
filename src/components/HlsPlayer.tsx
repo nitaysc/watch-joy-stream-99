@@ -52,6 +52,7 @@ export default function HlsPlayer({
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
   const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const menuOpenRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(0.7);
@@ -71,15 +72,16 @@ export default function HlsPlayer({
   const [showCcm, setShowCcm] = useState(false);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
 
+  const anyMenuOpen = showQualityMenu || showServerMenu || showCcm || showAudioMenu;
+  menuOpenRef.current = anyMenuOpen;
+
   const handleMouseMove = useCallback(() => {
     setShowControls(true);
-    setShowCcm(false);
-    setShowAudioMenu(false);
-    setShowQualityMenu(false);
-    setShowServerMenu(false);
     if (playing) {
       clearTimeout(hideTimer.current);
-      hideTimer.current = setTimeout(() => setShowControls(false), 3000);
+      hideTimer.current = setTimeout(() => {
+        if (!menuOpenRef.current) setShowControls(false);
+      }, 3000);
     }
   }, [playing]);
 
@@ -338,7 +340,12 @@ export default function HlsPlayer({
       ref={containerRef}
       className="group relative h-full w-full cursor-pointer overflow-hidden bg-black select-none"
       onMouseMove={handleMouseMove}
-      onMouseLeave={() => playing && setShowControls(false)}
+      onMouseLeave={() => {
+        if (playing && !menuOpenRef.current) {
+          clearTimeout(hideTimer.current);
+          hideTimer.current = setTimeout(() => setShowControls(false), 500);
+        }
+      }}
       onClick={togglePlay}
     >
       {poster && (
