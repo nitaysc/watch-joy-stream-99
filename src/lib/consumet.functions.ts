@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 
-const CONSUMET_BASE = process.env.VITE_CONSUMET_URL ?? "http://localhost:3001";
+const CONSUMET_BASE = process.env.VITE_CONSUMET_URL ?? "https://consumet-api-production-9752.up.railway.app";
 
 export interface AnimeSearchResult {
   id: string;
@@ -33,6 +33,7 @@ export interface AnimeInfo {
 export interface AnimeSource {
   url: string;
   quality?: string;
+  isM3U8?: boolean;
 }
 
 export interface EpisodeSources {
@@ -91,7 +92,7 @@ export const getEpisodeSources = createServerFn({ method: "GET" })
 
 export const getRecentAnime = createServerFn({ method: "GET" })
   .handler(async () => {
-    const res = await fetch(`${CONSUMET_BASE}/anime/recent`, {
+    const res = await fetch(`${CONSUMET_BASE}/anime/trending`, {
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) return [];

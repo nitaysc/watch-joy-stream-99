@@ -43,13 +43,15 @@ function AnimePage() {
     getEpisodeSources({ data: { id: ep.id } })
       .then((data) => {
         const sorted = [...(data.sources ?? [])].sort((a, b) => {
-          const ra = parseInt(a.quality ?? "0", 10);
-          const rb = parseInt(b.quality ?? "0", 10);
+          const ra = parseInt(a.quality ?? "0", 10) || 0;
+          const rb = parseInt(b.quality ?? "0", 10) || 0;
           return rb - ra;
         });
-        if (sorted.length > 0) {
-          setStreamUrl(sorted[0].url);
-          setStreamType(sorted[0].url?.includes(".m3u8") ? "application/x-mpegURL" : "video/mp4");
+        const best = sorted.length > 0 ? sorted[0] : data.sources?.[0];
+        if (best) {
+          setStreamUrl(best.url);
+          const isM3U8 = best.isM3U8 ?? best.url?.includes(".m3u8");
+          setStreamType(isM3U8 ? "application/x-mpegURL" : "video/mp4");
         }
       })
       .catch(() => {})
