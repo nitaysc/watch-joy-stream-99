@@ -8,12 +8,19 @@ import {
   Loader2, Subtitles, Languages, Server, ChevronLeft, ChevronRight
 } from "lucide-react";
 import "./modern-player.css";
+import { getSubtitleVtt } from "@/lib/opensubtitles.functions";
 
 export interface ServerSource {
   url: string;
   type?: string;
   quality?: string;
   provider?: { name: string };
+}
+
+export interface ExternalSubtitle {
+  file_id: number;
+  language: string;
+  label: string;
 }
 
 interface HlsPlayerProps {
@@ -28,6 +35,7 @@ interface HlsPlayerProps {
   episodeInfo?: string;
   onPrevEpisode?: () => void;
   onNextEpisode?: () => void;
+  externalSubtitles?: ExternalSubtitle[];
 }
 
 function formatTime(s: number) {
@@ -49,7 +57,7 @@ function volumeIcon(vol: number, muted: boolean) {
 export default function HlsPlayer({
   src, type = "application/x-mpegURL", poster, autoplay = false,
   sources = [], activeSourceIdx = 0, onSourceChange, onError,
-  episodeInfo, onPrevEpisode, onNextEpisode
+  episodeInfo, onPrevEpisode, onNextEpisode, externalSubtitles = []
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
@@ -75,6 +83,10 @@ export default function HlsPlayer({
   const [audioTracks, setAudioTracks] = useState<{ label: string; language: string; enabled: boolean }[]>([]);
   const [showCcm, setShowCcm] = useState(false);
   const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [externalVtts, setExternalVtts] = useState<Record<number, string>>({});
+  const [loadingSub, setLoadingSub] = useState<Set<number>>(new Set());
+  const externalTrackRefs = useRef<{ fileId: number; el: HTMLTrackElement; blobUrl: string }[]>([]);
+  const activeExternal = useRef<number | null>(null);
 
   const anyMenuOpen = showQualityMenu || showServerMenu || showCcm || showAudioMenu;
   menuOpenRef.current = anyMenuOpen;
@@ -188,6 +200,96 @@ export default function HlsPlayer({
       }
     } catch {}
   }, []);
+
+  const getExternalTrackEl = (fileId: number) =>
+    externalTrackRefs.current.find((t) => t.fileId === fileId)?.el ?? null;
+
+  const removeExternalTracks = () => {
+    for (const t of externalTrackRefs.current) {
+      URL.revokeObjectURL(t.blobUrl);
+      try { t.el.remove(); } catch {}
+    }
+    externalTrackRefs.current = [];
+    activeExternal.current = null;
+  };
+
+  const handleExternalSubtitle = async (fileId: number) => {
+    const p = playerRef.current;
+    if (!p) return;
+
+    // Toggle off if already active
+    if (activeExternal.current === fileId) {
+      const existing = getExternalTrackEl(fileId);
+      if (existing) existing.mode = "disabled";
+      activeExternal.current = null;
+      setShowCcm(false);
+      return;
+    }
+
+    // Disable all embedded tracks
+    const tt = p.textTracks();
+    for (let i = 0; i < tt.length; i++) tt[i].mode = "disabled";
+
+    // Disable other external tracks
+    for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+
+    // Check if already loaded
+    const existing = getExternalTrackEl(fileId);
+    if (existing) {
+      existing.mode = "showing";
+      activeExternal.current = fileId;
+      setShowCcm(false);
+      return;
+    }
+
+    // Check if VTT already cached
+    let vtt = externalVtts[fileId];
+    if (!vtt) {
+      setLoadingSub((prev) => new Set(prev).add(fileId));
+      try {
+        const result = await getSubtitleVtt({ data: { file_id: fileId } });
+        vtt = result.vtt;
+        setExternalVtts((prev) => ({ ...prev, [fileId]: vtt! }));
+      } catch {
+        setLoadingSub((prev) => { const n = new Set(prev); n.delete(fileId); return n; });
+        return;
+      }
+      setLoadingSub((prev) => { const n = new Set(prev); n.delete(fileId); return n; });
+    }
+
+    if (!vtt) return;
+
+    const blob = new Blob([vtt], { type: "text/vtt" });
+    const blobUrl = URL.createObjectURL(blob);
+    const trackEl = document.createElement("track");
+    trackEl.kind = "subtitles";
+    trackEl.label = externalSubtitles.find((s) => s.file_id === fileId)?.label ?? "Subtitles";
+    trackEl.srclang = externalSubtitles.find((s) => s.file_id === fileId)?.language ?? "en";
+    trackEl.src = blobUrl;
+    trackEl.default = true;
+
+    const videoEl = p.el().querySelector("video");
+    if (videoEl) {
+      videoEl.appendChild(trackEl);
+      // Re-initialize text tracks
+      const newTt = p.textTracks();
+      for (let i = 0; i < newTt.length; i++) {
+        newTt[i].mode = newTt[i] === trackEl.track ? "showing" : "disabled";
+      }
+    }
+
+    externalTrackRefs.current.push({ fileId, el: trackEl, blobUrl });
+    activeExternal.current = fileId;
+    setShowCcm(false);
+  };
+
+  // Cleanup external tracks on source change
+  useEffect(() => {
+    removeExternalTracks();
+    setExternalVtts({});
+    setLoadingSub(new Set());
+    activeExternal.current = null;
+  }, [src]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -559,18 +661,18 @@ export default function HlsPlayer({
             )}
 
             {/* Subtitles / CC */}
-            {hasSubtitles && (
+            {(hasSubtitles || externalSubtitles.length > 0) && (
               <div className="relative">
                 <button
                   onClick={(e) => { e.stopPropagation(); setShowCcm(!showCcm); setShowAudioMenu(false); setShowQualityMenu(false); setShowServerMenu(false); }}
                   className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:bg-white/10 ${
-                    subtitleTracks.some((t) => t.mode === "showing") ? "text-primary" : "text-white/40 hover:text-white"
+                    subtitleTracks.some((t) => t.mode === "showing") || activeExternal.current !== null ? "text-primary" : "text-white/40 hover:text-white"
                   }`}
                 >
                   <Subtitles className="h-4 w-4" />
                 </button>
                 {showCcm && (
-                  <div className="absolute bottom-full right-0 mb-2 min-w-[140px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl">
+                  <div className="absolute bottom-full right-0 mb-2 min-w-[160px] rounded-xl bg-black/90 p-1.5 backdrop-blur-2xl ring-1 ring-white/10 shadow-2xl max-h-[300px] overflow-y-auto">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -578,24 +680,28 @@ export default function HlsPlayer({
                         if (!p) return;
                         const tt = p.textTracks();
                         for (let i = 0; i < tt.length; i++) tt[i].mode = "disabled";
+                        for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+                        activeExternal.current = null;
                         setShowCcm(false);
                         updateTracks();
                       }}
                       className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
-                        subtitleTracks.every((t) => t.mode === "disabled") ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
+                        subtitleTracks.every((t) => t.mode === "disabled") && activeExternal.current === null ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
                       }`}
                     >
                       Off
                     </button>
                     {subtitleTracks.map((t, i) => (
                       <button
-                        key={i}
+                        key={`embed-${i}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           const p = playerRef.current;
                           if (!p) return;
                           const tt = p.textTracks();
                           for (let j = 0; j < tt.length; j++) tt[j].mode = j === i ? "showing" : "disabled";
+                          for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+                          activeExternal.current = null;
                           setShowCcm(false);
                           updateTracks();
                         }}
@@ -606,6 +712,32 @@ export default function HlsPlayer({
                         {t.label}
                       </button>
                     ))}
+                    {externalSubtitles.length > 0 && (
+                      <>
+                        <div className="my-1 border-t border-white/10" />
+                        <div className="px-3 py-1 text-[10px] font-semibold tracking-wider text-white/30 uppercase">OpenSubtitles</div>
+                        {externalSubtitles.map((sub) => (
+                          <button
+                            key={`ext-${sub.file_id}`}
+                            onClick={(e) => { e.stopPropagation(); handleExternalSubtitle(sub.file_id); }}
+                            disabled={loadingSub.has(sub.file_id)}
+                            className={`w-full rounded-lg px-3 py-1.5 text-left text-xs transition-all ${
+                              activeExternal.current === sub.file_id ? "bg-primary/20 text-primary font-medium" : "text-white/50 hover:bg-white/5 hover:text-white"
+                            } disabled:opacity-40`}
+                          >
+                            {loadingSub.has(sub.file_id) ? (
+                              <span className="flex items-center gap-2">
+                                <svg className="h-3 w-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.2" />
+                                  <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Loading...
+                              </span>
+                            ) : sub.label}
+                          </button>
+                        ))}
+                      </>
+                    )}
                   </div>
                 )}
               </div>

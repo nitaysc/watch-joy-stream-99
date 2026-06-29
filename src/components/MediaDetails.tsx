@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { RefreshCw } from "lucide-react";
-import HlsPlayer, { type ServerSource } from "@/components/HlsPlayer";
+import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
+import { searchSubtitles } from "@/lib/opensubtitles.functions";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -83,6 +84,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const [sources, setSources] = useState<ServerSource[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchId = useRef(0);
+  const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
@@ -121,12 +123,27 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     setStreamUrl(null);
 
     getStreams({ data: { id, mediaType, season, episode } })
-      .then((data) => {
+      .then(async (data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
         const sorted = [...data.sources].sort(sortSources);
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
+        // Fetch available subtitles from OpenSubtitles
+        try {
+          const subs = await searchSubtitles({ data: {
+            tmdbId: Number(id),
+            season: season ? Number(season) : undefined,
+            episode: episode ? Number(episode) : undefined,
+          }});
+          if (currentId === fetchId.current) {
+            setSubtitles(subs.map((s) => ({
+              file_id: s.file_id,
+              language: s.language,
+              label: s.language_english_name + (s.hearing_impaired ? " [HI]" : ""),
+            })));
+          }
+        } catch {}
       })
       .catch((err) => {
         if (currentId !== fetchId.current) return;
@@ -188,6 +205,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
               episodeInfo={episodeInfo}
               onPrevEpisode={onPrevEpisode}
               onNextEpisode={onNextEpisode}
+              externalSubtitles={subtitles}
             />
           </div>
         ) : (
