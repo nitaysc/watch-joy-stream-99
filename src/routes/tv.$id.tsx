@@ -40,7 +40,10 @@ function TvPage() {
 
   const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
-  const src = `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true`;
+  const isOnePiece = tvId === 37854;
+  const src = isOnePiece 
+    ? `https://player.autoembed.cc/embed/tv/${tvId}/${season}/${episode}`
+    : `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true`;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
