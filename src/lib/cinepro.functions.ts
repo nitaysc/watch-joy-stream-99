@@ -52,38 +52,28 @@ export const getStreams = createServerFn({ method: "GET" })
     } catch {}
 
     let json: CineProResponse | null = null;
-    const attempts = [fetchWithTimeout(url, 12000)];
 
-    if (process.env.NODE_ENV !== "development") {
-      attempts.push(fetchWithTimeout(url, 14000));
+    const first = await fetchWithTimeout(url, 10000);
+    if (first.ok) {
+      try { json = await first.json(); } catch {}
     }
 
-    const results = await Promise.allSettled(attempts);
-    for (const result of results) {
-      if (result.status === "fulfilled" && result.value.ok) {
-        try {
-          json = await result.value.json();
-          if (json?.sources?.length) break;
-        } catch {}
+    if (!json?.sources?.length) {
+      const second = await fetchWithTimeout(url, 15000);
+      if (second.ok) {
+        try { json = await second.json(); } catch {}
       }
     }
 
-    if (!json || !json.sources?.length) {
-      const res = await fetchWithTimeout(url, 20000);
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        throw new Error(`CinePro returned ${res.status}${text ? `: ${text.slice(0, 100)}` : ""}`);
-      }
-      json = await res.json();
+    if (!json?.sources?.length) {
+      throw new Error("No sources returned from CinePro");
     }
 
     // Rewrite localhost proxy URLs to the actual CinePro base
-    if (json.sources) {
-      json.sources = json.sources.map((s) => ({
-        ...s,
-        url: s.url.replace(/http:\/\/localhost:\d+/, CINEPRO_BASE),
-      }));
-    }
+    json.sources = json.sources.map((s) => ({
+      ...s,
+      url: s.url.replace(/http:\/\/localhost:\d+/, CINEPRO_BASE),
+    }));
 
     try {
       const cache = caches.default as any;
