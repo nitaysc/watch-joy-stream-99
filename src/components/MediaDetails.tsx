@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import HlsPlayer from "@/components/HlsPlayer";
 
 interface MediaDetailsProps {
@@ -34,33 +34,40 @@ function toUrl(id: string | number, mediaType: string, season?: string, episode?
 export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [errorToast, setErrorToast] = useState<string | null>(null);
   const [sources, setSources] = useState<Source[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
 
-  const handlePlayClick = async () => {
+  useEffect(() => {
+    let cancelled = false;
     setIsLoading(true);
     setErrorToast(null);
 
-    try {
-      const url = toUrl(id, mediaType, season, episode);
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`CinePro returned ${res.status}`);
-      const data: CineProResponse = await res.json();
+    const url = toUrl(id, mediaType, season, episode);
+    fetch(url)
+      .then((r) => {
+        if (!r.ok) throw new Error(`CinePro returned ${r.status}`);
+        return r.json() as Promise<CineProResponse>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (!data.sources?.length) throw new Error("No sources returned");
+        setSources(data.sources);
+        setStreamUrl(data.sources[0].url);
+        setStreamType(data.sources[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error(err);
+        setErrorToast("CinePro unavailable or asset not found.");
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
 
-      if (!data.sources?.length) throw new Error("No sources returned");
-
-      setSources(data.sources);
-      setStreamUrl(data.sources[0].url);
-      setStreamType(data.sources[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
-    } catch (err) {
-      console.error(err);
-      setErrorToast("CinePro unavailable or asset not found.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    return () => { cancelled = true; };
+  }, [id, mediaType, season, episode]);
 
   const switchSource = (idx: number) => {
     setActiveIdx(idx);
@@ -111,23 +118,17 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
           />
         ) : (
           <div className="flex h-full items-center justify-center">
-            <button
-              onClick={handlePlayClick}
-              disabled={isLoading}
-              className="flex items-center gap-2 rounded-lg bg-primary px-8 py-3 text-lg font-bold text-primary-foreground transition hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {isLoading ? (
-                <>
-                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
-                    <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                  </svg>
-                  Loading...
-                </>
-              ) : (
-                "▶ Play"
-              )}
-            </button>
+            {isLoading ? (
+              <div className="flex flex-col items-center gap-3">
+                <svg className="h-10 w-10 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" strokeOpacity="0.25" />
+                  <path fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                <span className="text-sm text-muted-foreground">Loading stream...</span>
+              </div>
+            ) : (
+              <span className="text-sm text-muted-foreground">No stream available</span>
+            )}
           </div>
         )}
       </div>
