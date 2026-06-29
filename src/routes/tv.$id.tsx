@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
-import { Star, Calendar, ChevronDown, Server } from "lucide-react";
+import { Star, Calendar, ChevronDown, Server, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import i18n from "@/lib/i18n";
 import { Button } from "@/components/ui/button";
+import { useServerPing } from "@/hooks/use-servers";
 
 const tvQuery = (id: number, language: string) =>
   queryOptions({ queryKey: ["tv", id, language], queryFn: () => getTv({ data: { id, language } }) });
@@ -46,18 +47,21 @@ function TvPage() {
     { name: "VidSrc", url: `https://vidsrc.xyz/embed/tv/${tvId}/${season}/${episode}` },
     { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${tvId}&tmdb=1&s=${season}&e=${episode}` },
   ];
-  const [serverIndex, setServerIndex] = useState(tvId === 37854 ? 2 : 0);
+  
+  const { pings, checking, bestIndex, setBestIndex } = useServerPing(servers, tvId === 37854);
 
-  useEffect(() => {
-    setServerIndex(tvId === 37854 ? 2 : 0);
-  }, [tvId]);
-
-  const src = servers[serverIndex].url;
+  const src = servers[bestIndex].url;
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border shadow-glow">
+      <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border shadow-glow relative">
         <div className="aspect-video w-full">
+          {checking ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm z-10">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+              <p className="text-sm font-medium animate-pulse">{t("Finding the best server...")}</p>
+            </div>
+          ) : null}
           <iframe
             key={src}
             src={src}
@@ -90,17 +94,27 @@ function TvPage() {
           <Server className="h-4 w-4" /> {t("Servers")}
         </span>
         <div className="flex flex-wrap gap-2">
-          {servers.map((s, i) => (
-            <Button
-              key={s.name}
-              variant={serverIndex === i ? "default" : "outline"}
-              size="sm"
-              onClick={() => setServerIndex(i)}
-              className="rounded-full"
-            >
-              {s.name}
-            </Button>
-          ))}
+          {servers.map((s, i) => {
+            const ping = pings[s.name];
+            return (
+              <Button
+                key={s.name}
+                variant={bestIndex === i ? "default" : "outline"}
+                size="sm"
+                onClick={() => setBestIndex(i)}
+                className="rounded-full flex items-center gap-2"
+                disabled={checking}
+              >
+                {s.name}
+                {!checking && ping !== undefined && (
+                  <span className="flex items-center text-[10px] opacity-80">
+                    {ping === null ? <XCircle className="h-3 w-3 text-destructive mr-1" /> : <CheckCircle2 className="h-3 w-3 text-green-500 mr-1" />}
+                    {ping !== null ? `${ping}ms` : "Offline"}
+                  </span>
+                )}
+              </Button>
+            );
+          })}
         </div>
       </div>
 

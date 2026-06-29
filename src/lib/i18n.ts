@@ -42,7 +42,8 @@ const resources = {
       "No image": "No image",
       "Movie": "Movie",
       "TV Series": "TV Series",
-      "Servers": "Servers"
+      "Servers": "Servers",
+      "Finding the best server...": "Finding the best server..."
     }
   },
   he: {
@@ -85,7 +86,8 @@ const resources = {
       "No image": "אין תמונה",
       "Movie": "סרט",
       "TV Series": "סדרה",
-      "Servers": "שרתים"
+      "Servers": "שרתים",
+      "Finding the best server...": "מוצא את השרת הטוב ביותר..."
     }
   },
   ru: {
@@ -128,7 +130,8 @@ const resources = {
       "No image": "Нет изображения",
       "Movie": "Фильм",
       "TV Series": "Сериал",
-      "Servers": "Серверы"
+      "Servers": "Серверы",
+      "Finding the best server...": "Поиск лучшего сервера..."
     }
   }
 };
