@@ -5,9 +5,11 @@ import { Row } from "@/components/Row";
 import { Play, Info } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-const homeQuery = queryOptions({
-  queryKey: ["home"],
-  queryFn: () => getHome(),
+import i18n from "@/lib/i18n";
+
+const homeQuery = (language: string) => queryOptions({
+  queryKey: ["home", language],
+  queryFn: () => getHome({ data: { language } }),
 });
 
 export const Route = createFileRoute("/")({
@@ -17,7 +19,7 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Stream trending movies and TV shows in HD for free." },
     ],
   }),
-  loader: ({ context }) => context.queryClient.ensureQueryData(homeQuery),
+  loader: ({ context }) => context.queryClient.ensureQueryData(homeQuery(i18n.language)),
   component: HomePage,
   errorComponent: ({ error }) => (
     <div className="p-8 text-center text-sm text-destructive">{error.message}</div>
@@ -25,9 +27,9 @@ export const Route = createFileRoute("/")({
 });
 
 function HomePage() {
-  const { data } = useSuspenseQuery(homeQuery);
+  const { t, i18n } = useTranslation();
+  const { data } = useSuspenseQuery(homeQuery(i18n.language));
   const hero = data.trending.find((t) => t.backdrop) ?? data.trending[0];
-  const { t } = useTranslation();
 
   return (
     <main className="pb-20">

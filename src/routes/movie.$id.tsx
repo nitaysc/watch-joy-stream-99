@@ -3,13 +3,14 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { getMovie } from "@/lib/tmdb.functions";
 import { Star, Clock, Calendar } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
-const movieQuery = (id: number) =>
-  queryOptions({ queryKey: ["movie", id], queryFn: () => getMovie({ data: { id } }) });
+const movieQuery = (id: number, language: string) =>
+  queryOptions({ queryKey: ["movie", id, language], queryFn: () => getMovie({ data: { id, language } }) });
 
 export const Route = createFileRoute("/movie/$id")({
   loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(movieQuery(Number(params.id))),
+    context.queryClient.ensureQueryData(movieQuery(Number(params.id), i18n.language)),
   component: MoviePage,
   head: ({ loaderData }) => ({
     meta: [
@@ -23,8 +24,8 @@ export const Route = createFileRoute("/movie/$id")({
 
 function MoviePage() {
   const { id } = Route.useParams();
-  const { data: m } = useSuspenseQuery(movieQuery(Number(id)));
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { data: m } = useSuspenseQuery(movieQuery(Number(id), i18n.language));
   const src = `https://www.vidking.net/embed/movie/${id}?color=e85c5c&autoPlay=true`;
 
   return (

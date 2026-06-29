@@ -2,6 +2,13 @@ import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Film, Search, Globe } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export function Header() {
   const navigate = useNavigate();
@@ -13,8 +20,16 @@ export function Header() {
     setQ(search.q ?? "");
   }, [search.q]);
 
-  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    i18n.changeLanguage(e.target.value);
+  const handleLanguageChange = (lang: string) => {
+    i18n.changeLanguage(lang);
+  };
+
+  const currentLanguageLabel = () => {
+    switch(i18n.language) {
+      case 'he': return 'עברית';
+      case 'ru': return 'Русский';
+      default: return 'English';
+    }
   };
 
   return (
@@ -39,18 +54,26 @@ export function Header() {
             className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </form>
-        <div className="flex items-center gap-1 ml-2 text-muted-foreground hover:text-foreground transition-colors">
-          <Globe className="h-4 w-4" />
-          <select
-            value={i18n.language}
-            onChange={handleLanguageChange}
-            className="bg-transparent text-sm font-medium outline-none cursor-pointer text-foreground"
-            dir="ltr"
-          >
-            <option value="he">עברית</option>
-            <option value="en">English</option>
-            <option value="ru">Русский</option>
-          </select>
+        <div className="flex items-center gap-1 ml-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 gap-2 px-2 text-muted-foreground hover:text-foreground">
+                <Globe className="h-4 w-4" />
+                <span className="text-sm font-medium">{currentLanguageLabel()}</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-[120px]">
+              <DropdownMenuItem onClick={() => handleLanguageChange("he")} className={i18n.language === "he" ? "bg-muted" : ""}>
+                עברית
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("en")} className={i18n.language === "en" ? "bg-muted" : ""}>
+                English
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleLanguageChange("ru")} className={i18n.language === "ru" ? "bg-muted" : ""}>
+                Русский
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

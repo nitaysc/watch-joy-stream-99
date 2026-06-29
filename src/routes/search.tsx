@@ -6,12 +6,14 @@ import { searchMedia } from "@/lib/tmdb.functions";
 import { MediaCard } from "@/components/MediaCard";
 import { useTranslation } from "react-i18next";
 
+import i18n from "@/lib/i18n";
+
 const searchSchema = z.object({ q: z.string().optional().default("") });
 
-const buildQuery = (q: string) =>
+const buildQuery = (q: string, language: string) =>
   queryOptions({
-    queryKey: ["search", q],
-    queryFn: () => searchMedia({ data: { q } }),
+    queryKey: ["search", q, language],
+    queryFn: () => searchMedia({ data: { q, language } }),
     enabled: q.length > 0,
   });
 
@@ -19,7 +21,7 @@ export const Route = createFileRoute("/search")({
   validateSearch: zodValidator(searchSchema),
   loaderDeps: ({ search }) => ({ q: search.q }),
   loader: ({ context, deps }) => {
-    if (deps.q) return context.queryClient.ensureQueryData(buildQuery(deps.q));
+    if (deps.q) return context.queryClient.ensureQueryData(buildQuery(deps.q, i18n.language));
   },
   head: ({ loaderData: _ld, params: _p }) => ({
     meta: [{ title: "Search — Cinely" }, { name: "description", content: "Search movies and TV series." }],
@@ -30,8 +32,8 @@ export const Route = createFileRoute("/search")({
 
 function SearchPage() {
   const { q } = Route.useSearch();
-  const { data } = useSuspenseQuery({ ...buildQuery(q), initialData: q ? undefined : { results: [] } });
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const { data } = useSuspenseQuery({ ...buildQuery(q, i18n.language), initialData: q ? undefined : { results: [] } });
 
   return (
     <main className="mx-auto max-w-7xl px-4 py-10">

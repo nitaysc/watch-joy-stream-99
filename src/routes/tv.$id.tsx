@@ -4,19 +4,20 @@ import { useState } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
 import { Star, Calendar, ChevronDown } from "lucide-react";
 import { useTranslation } from "react-i18next";
+import i18n from "@/lib/i18n";
 
-const tvQuery = (id: number) =>
-  queryOptions({ queryKey: ["tv", id], queryFn: () => getTv({ data: { id } }) });
+const tvQuery = (id: number, language: string) =>
+  queryOptions({ queryKey: ["tv", id, language], queryFn: () => getTv({ data: { id, language } }) });
 
-const seasonQuery = (id: number, season: number) =>
+const seasonQuery = (id: number, season: number, language: string) =>
   queryOptions({
-    queryKey: ["tv", id, "season", season],
-    queryFn: () => getSeason({ data: { id, season } }),
+    queryKey: ["tv", id, "season", season, language],
+    queryFn: () => getSeason({ data: { id, season, language } }),
   });
 
 export const Route = createFileRoute("/tv/$id")({
   loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(tvQuery(Number(params.id))),
+    context.queryClient.ensureQueryData(tvQuery(Number(params.id), i18n.language)),
   component: TvPage,
   head: ({ loaderData }) => ({
     meta: [
@@ -31,13 +32,13 @@ export const Route = createFileRoute("/tv/$id")({
 function TvPage() {
   const { id } = Route.useParams();
   const tvId = Number(id);
-  const { data: m } = useSuspenseQuery(tvQuery(tvId));
+  const { t, i18n } = useTranslation();
+  const { data: m } = useSuspenseQuery(tvQuery(tvId, i18n.language));
   const firstSeason = m.seasons[0]?.season_number ?? 1;
   const [season, setSeason] = useState<number>(firstSeason);
   const [episode, setEpisode] = useState<number>(1);
-  const { t } = useTranslation();
 
-  const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season));
+  const { data: seasonData, isLoading: epLoading } = useQuery(seasonQuery(tvId, season, i18n.language));
 
   const src = `https://www.vidking.net/embed/tv/${tvId}/${season}/${episode}?color=e85c5c&autoPlay=true&nextEpisode=true&episodeSelector=true`;
 
