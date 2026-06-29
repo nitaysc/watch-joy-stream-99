@@ -6,6 +6,7 @@ import "@videojs/http-streaming";
 
 interface HlsPlayerProps {
   src: string;
+  type?: string;
   poster?: string;
   autoplay?: boolean;
   controls?: boolean;
@@ -15,6 +16,7 @@ interface HlsPlayerProps {
 
 export default function HlsPlayer({
   src,
+  type = "application/x-mpegURL",
   poster,
   autoplay = false,
   controls = true,
@@ -42,7 +44,7 @@ export default function HlsPlayer({
       },
     });
     player.qualityLevels();
-    player.src({ src, type: "application/x-mpegURL" });
+    player.src({ src, type });
     playerRef.current = player;
     return () => {
       player.dispose();
@@ -54,10 +56,10 @@ export default function HlsPlayer({
     const player = playerRef.current;
     if (!player) return;
     if (player.currentSrc() !== src) {
-      player.src({ src, type: "application/x-mpegURL" });
+      player.src({ src, type });
       player.play();
     }
-  }, [src]);
+  }, [src, type]);
 
   return (
     <div data-vjs-player className="relative" style={{ width, height }}>

@@ -9,46 +9,34 @@ interface MediaDetailsProps {
   episode?: string;
 }
 
-interface OmssSource {
+interface Source {
   url: string;
-  type?: string;
-  label?: string;
+  type: string;
+  quality: string;
+  provider?: { name: string };
 }
 
-interface OmssResponse {
-  sources?: OmssSource[];
-  streams?: OmssSource[];
-  [key: string]: unknown;
+interface CineProResponse {
+  responseId: string;
+  expiresAt: string;
+  sources: Source[];
 }
 
-const CINEPRO_BASE = "http://localhost:3000/api/omss";
+const CINEPRO_BASE = "http://localhost:3000";
 
-function buildApiUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
-  const base = `${CINEPRO_BASE}/${mediaType}/${id}`;
+function toUrl(id: string | number, mediaType: string, season?: string, episode?: string): string {
   if (mediaType === "tv") {
-    return `${base}?season=${season ?? "1"}&episode=${episode ?? "1"}`;
+    return `${CINEPRO_BASE}/v1/tv/${id}/seasons/${season ?? "1"}/episodes/${episode ?? "1"}`;
   }
-  return base;
-}
-
-function parseOmssSources(data: OmssResponse): OmssSource[] {
-  const list = data.sources ?? data.streams ?? [];
-  if (list.length === 0) {
-    const fallback = data["url"] as string | undefined;
-    if (fallback) return [{ url: fallback }];
-  }
-  return list.map((s) => ({
-    url: s.url,
-    type: s.type ?? "application/x-mpegURL",
-    label: s.label ?? "Auto",
-  }));
+  return `${CINEPRO_BASE}/v1/movies/${id}`;
 }
 
 export default function MediaDetails({ id, mediaType, poster, season, episode }: MediaDetailsProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
+  const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
   const [isLoading, setIsLoading] = useState(false);
   const [errorToast, setErrorToast] = useState<string | null>(null);
-  const [sources, setSources] = useState<OmssSource[]>([]);
+  const [sources, setSources] = useState<Source[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
 
   const handlePlayClick = async () => {
@@ -56,16 +44,16 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
     setErrorToast(null);
 
     try {
-      const url = buildApiUrl(id, mediaType, season, episode);
+      const url = toUrl(id, mediaType, season, episode);
       const res = await fetch(url);
       if (!res.ok) throw new Error(`CinePro returned ${res.status}`);
-      const data: OmssResponse = await res.json();
-      const parsed = parseOmssSources(data);
+      const data: CineProResponse = await res.json();
 
-      if (parsed.length === 0) throw new Error("No sources in OMSS response");
+      if (!data.sources?.length) throw new Error("No sources returned");
 
-      setSources(parsed);
-      setStreamUrl(parsed[0].url);
+      setSources(data.sources);
+      setStreamUrl(data.sources[0].url);
+      setStreamType(data.sources[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
     } catch (err) {
       console.error(err);
       setErrorToast("CinePro unavailable or asset not found.");
@@ -77,6 +65,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
   const switchSource = (idx: number) => {
     setActiveIdx(idx);
     setStreamUrl(sources[idx].url);
+    setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
   };
 
   return (
@@ -102,7 +91,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {s.label ?? `Source ${i + 1}`}
+              {s.quality ?? s.provider?.name ?? `Source ${i + 1}`}
             </button>
           ))}
         </div>
@@ -113,6 +102,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
           <HlsPlayer
             key={activeIdx}
             src={streamUrl}
+            type={streamType}
             poster={poster}
             autoplay
             controls
