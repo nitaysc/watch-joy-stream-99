@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { getTv, getSeason } from "@/lib/tmdb.functions";
 import { Star, Calendar, ChevronDown, Server } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -46,7 +46,11 @@ function TvPage() {
     { name: "VidSrc", url: `https://vidsrc.xyz/embed/tv/${tvId}/${season}/${episode}` },
     { name: "SuperEmbed", url: `https://multiembed.mov/directstream.php?video_id=${tvId}&tmdb=1&s=${season}&e=${episode}` },
   ];
-  const [serverIndex, setServerIndex] = useState(0);
+  const [serverIndex, setServerIndex] = useState(tvId === 37854 ? 2 : 0);
+
+  useEffect(() => {
+    setServerIndex(tvId === 37854 ? 2 : 0);
+  }, [tvId]);
 
   const src = servers[serverIndex].url;
 
