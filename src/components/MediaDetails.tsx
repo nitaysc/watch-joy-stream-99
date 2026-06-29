@@ -107,12 +107,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
       )}
 
       {/* Stream area */}
-      <div className="relative overflow-hidden rounded-xl bg-black ring-1 ring-border">
+      <div className="overflow-hidden rounded-xl bg-black ring-1 ring-border">
         {streamUrl ? (
           <>
             {/* Server bar */}
             {sources.length > 1 && (
-              <div className="relative z-10 flex flex-wrap items-center gap-1.5 border-b border-white/5 bg-white/5 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-1.5 border-b border-white/5 bg-white/5 px-3 py-2">
                 <Server className="mr-1 h-3.5 w-3.5 text-muted-foreground" />
                 {Object.entries(grouped).map(([provider, quals]) => {
                   const idx = sources.indexOf(quals[0]);
@@ -163,16 +163,18 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
                 )}
               </div>
             )}
-            <HlsPlayer
-              key={activeIdx}
-              src={streamUrl}
-              type={streamType}
-              poster={poster}
-              autoplay
-              controls
-              width="100%"
-              height="100%"
-            />
+            <div className="aspect-video w-full">
+              <HlsPlayer
+                key={activeIdx}
+                src={streamUrl}
+                type={streamType}
+                poster={poster}
+                autoplay
+                controls
+                width="100%"
+                height="100%"
+              />
+            </div>
           </>
         ) : (
           <div className="flex aspect-video items-center justify-center">
