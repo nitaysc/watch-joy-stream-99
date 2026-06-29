@@ -1,15 +1,13 @@
-import { useEffect, useRef, useMemo } from "react";
+import { useEffect, useRef } from "react";
 import videojs from "video.js";
 import "video.js/dist/video-js.css";
-
 import "videojs-contrib-quality-levels";
 import "@videojs/http-streaming";
-
 import "./modern-player.css";
-import { getProxiedUrl } from "./proxy";
 
 interface HlsPlayerProps {
   src: string;
+  type?: string;
   poster?: string;
   autoplay?: boolean;
   controls?: boolean;
@@ -19,6 +17,7 @@ interface HlsPlayerProps {
 
 export default function HlsPlayer({
   src,
+  type = "application/x-mpegURL",
   poster,
   autoplay = false,
   controls = true,
@@ -27,8 +26,6 @@ export default function HlsPlayer({
 }: HlsPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
-
-  const proxiedSrc = useMemo(() => getProxiedUrl(src), [src]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -50,7 +47,7 @@ export default function HlsPlayer({
     });
 
     player.qualityLevels();
-    player.src({ src: proxiedSrc, type: "application/x-mpegURL" });
+    player.src({ src, type });
 
     playerRef.current = player;
 
@@ -63,21 +60,19 @@ export default function HlsPlayer({
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
-    const currentSrc = player.currentSrc();
-    if (currentSrc !== proxiedSrc) {
-      player.src({ src: proxiedSrc, type: "application/x-mpegURL" });
+    if (player.currentSrc() !== src) {
+      player.src({ src, type });
       player.play();
     }
-  }, [proxiedSrc]);
+  }, [src, type]);
 
   return (
-    <div data-vjs-player style={{ position: "relative", width, height }}>
+    <div data-vjs-player className="relative" style={{ width, height }}>
       <video
         ref={videoRef}
-        className="video-js vjs-default-skin vjs-big-play-centered vjs-modern-theme"
+        className="video-js vjs-default-skin vjs-big-play-centered vjs-modern-theme h-full w-full"
         playsInline
         poster={poster}
-        style={{ width: "100%", height: "100%" }}
       />
     </div>
   );
