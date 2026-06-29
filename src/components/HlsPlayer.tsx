@@ -311,18 +311,18 @@ export default function HlsPlayer({
   const progressWatchRef = useRef<ReturnType<typeof setInterval>>();
   useEffect(() => {
     if (loading && !error) {
-      lastProgressRef.current = 0;
+      lastProgressRef.current = -1;
       clearInterval(progressWatchRef.current);
       progressWatchRef.current = setInterval(() => {
         const p = playerRef.current;
         if (!p) return;
         const ct = p.currentTime() ?? 0;
-        if (ct > 0 && ct === lastProgressRef.current && ct < (p.duration() ?? Infinity) - 5) {
-          onError?.();
-          clearInterval(progressWatchRef.current);
+        if (lastProgressRef.current >= 0 && ct === lastProgressRef.current) {
+          const dur = p.duration() ?? Infinity;
+          if (ct < dur - 5) { onError?.(); clearInterval(progressWatchRef.current); }
         }
         lastProgressRef.current = ct;
-      }, 15000);
+      }, 30000);
     } else {
       clearInterval(progressWatchRef.current);
     }

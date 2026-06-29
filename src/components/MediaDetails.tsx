@@ -127,6 +127,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
         const sorted = [...data.sources].sort(sortSources);
+        // Remove VidApi sources if any better provider exists
+        if (sorted.some((s) => sourcePriority(s) > 0)) {
+          const filtered = sorted.filter((s) => !SLOW_PROVIDERS.has(s.provider?.name ?? ""));
+          if (filtered.length > 0) sorted = filtered;
+        }
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
       })
@@ -176,7 +181,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode }:
         {streamUrl ? (
           <div className="aspect-video w-full">
             <HlsPlayer
-              key={`${activeIdx}-${streamUrl}`}
+              key={`${mediaType}-${id}`}
               src={streamUrl}
               type={streamType}
               poster={poster}

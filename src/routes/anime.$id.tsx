@@ -109,7 +109,7 @@ function AnimePage() {
           {streamUrl ? (
             <div className="aspect-video w-full">
               <HlsPlayer
-                key={`${anime.id}-${selectedEp}`}
+                key={anime.id}
                 src={streamUrl}
                 type={streamType}
                 poster={anime.image}
