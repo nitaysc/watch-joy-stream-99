@@ -306,19 +306,28 @@ export default function HlsPlayer({
     }
   }, [src, type]);
 
-  // Playback timeout: if source doesn't start playing within 8s, try next
-  const playTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  // Playback timeout: only if source hangs with zero progress for 30s
+  const lastProgressRef = useRef(0);
+  const progressWatchRef = useRef<ReturnType<typeof setInterval>>();
   useEffect(() => {
     if (loading && !error) {
-      clearTimeout(playTimeoutRef.current);
-      playTimeoutRef.current = setTimeout(() => {
-        if (!playing && !error) onError?.();
-      }, 8000);
+      lastProgressRef.current = 0;
+      clearInterval(progressWatchRef.current);
+      progressWatchRef.current = setInterval(() => {
+        const p = playerRef.current;
+        if (!p) return;
+        const ct = p.currentTime() ?? 0;
+        if (ct > 0 && ct === lastProgressRef.current && ct < (p.duration() ?? Infinity) - 5) {
+          onError?.();
+          clearInterval(progressWatchRef.current);
+        }
+        lastProgressRef.current = ct;
+      }, 15000);
     } else {
-      clearTimeout(playTimeoutRef.current);
+      clearInterval(progressWatchRef.current);
     }
-    return () => clearTimeout(playTimeoutRef.current);
-  }, [loading, playing, error, src]);
+    return () => clearInterval(progressWatchRef.current);
+  }, [loading, error, src]);
 
   useEffect(() => {
     const onChange = () => setFullscreen(!!document.fullscreenElement);
