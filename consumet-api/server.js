@@ -8,9 +8,8 @@ app.use(express.json());
 
 const PORT = process.env.PORT ?? 3001;
 
-// Ordered list of providers to try (prefer English providers first)
+// Providers that work reliably (Hianime removed — always times out on Cloudflare)
 const PROVIDERS = [
-  { name: "Hianime", instance: () => new ANIME.Hianime() },
   { name: "AnimeSaturn", instance: () => new ANIME.AnimeSaturn() },
   { name: "AnimeUnity", instance: () => new ANIME.AnimeUnity() },
 ];
@@ -22,7 +21,7 @@ async function tryProviders(method, ...args) {
       const provider = instance();
       const result = await Promise.race([
         provider[method](...args),
-        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 8000)),
+        new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), 5000)),
       ]);
       return { provider: name, data: result };
     } catch (err) {
