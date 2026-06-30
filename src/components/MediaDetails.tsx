@@ -186,22 +186,43 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           if (video.translations.length === 0) continue;
 
           const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-          const stream = await resolveStreamUrl({
-            data: {
-              videoId: video.id,
-              translatorId: translation.id,
-              season: season ? Number(season) : undefined,
-              episode: episode ? Number(episode) : undefined,
-            },
-          });
-          if (currentId !== hdrezkaFetchId.current || !stream) return;
 
-          const hlsUrl = stream.hls || stream.mp4;
+          // First try: use the stream data already embedded in the page HTML (always works)
+          let hlsUrl = "";
+          let streamType = "application/x-mpegURL";
+
+          if (video.defaultStream) {
+            const bestKey = Object.keys(video.defaultStream.formats).find(k => k === "1080p")
+              || Object.keys(video.defaultStream.formats).find(k => k === "720p")
+              || Object.keys(video.defaultStream.formats).find(k => k === "480p")
+              || Object.keys(video.defaultStream.formats)[0];
+            if (bestKey) {
+              const best = video.defaultStream.formats[bestKey];
+              hlsUrl = best.hls || best.mp4;
+              if (!best.hls && best.mp4) streamType = "video/mp4";
+            }
+          }
+
+          // Fallback: try the POST endpoint (requires cookies)
+          if (!hlsUrl) {
+            const stream = await resolveStreamUrl({
+              data: {
+                videoId: video.id,
+                translatorId: translation.id,
+                season: season ? Number(season) : undefined,
+                episode: episode ? Number(episode) : undefined,
+              },
+            });
+            if (currentId !== hdrezkaFetchId.current || !stream) return;
+            hlsUrl = stream.hls || stream.mp4;
+            if (!stream.hls && stream.mp4) streamType = "video/mp4";
+          }
+
           if (!hlsUrl) return;
 
           const hdSource: ServerSource = {
             url: hlsUrl,
-            type: stream.hls ? "application/x-mpegURL" : "video/mp4",
+            type: streamType,
             quality: "1080p",
             provider: { name: `HDRezka — ${translation.name}` },
           };
