@@ -195,11 +195,47 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       if (!videoRes.ok || currentId !== hdrezkaFetchId.current) return;
       const videoHtml = await videoRes.text();
 
-      // Extract translator name from the initCDN call
-      const initMatch = videoHtml.match(/initCDN(?:Series|Movies)Events\(\d+,\s(\d+),.+?(\{.*\})\);/);
-      if (!initMatch) return;
+      // Extract JSON payload using bracket matching
+      const lines = videoHtml.split('\n');
+      const initLine = lines.find(l => l.includes('initCDNSeriesEvents(') || l.includes('initCDNMoviesEvents('));
+      if (!initLine) return;
 
-      const defaultTranslatorId = initMatch[1];
+      const jsonStart = initLine.indexOf('{"id":"cdnplayer"');
+      if (jsonStart === -1) return;
+
+      let braceCount = 0;
+      let endIdx = -1;
+      let inString = false;
+      let escapeNext = false;
+      
+      for (let i = jsonStart; i < initLine.length; i++) {
+          const char = initLine[i];
+          if (escapeNext) { escapeNext = false; continue; }
+          if (char === '\\') { escapeNext = true; continue; }
+          if (char === '"') { inString = !inString; continue; }
+          if (!inString) {
+              if (char === '{') braceCount++;
+              else if (char === '}') {
+                  braceCount--;
+                  if (braceCount === 0) {
+                      endIdx = i;
+                      break;
+                  }
+              }
+          }
+      }
+      
+      if (endIdx === -1) return;
+      const jsnStr = initLine.substring(jsonStart, endIdx + 1);
+
+      let jsn;
+      try {
+        jsn = JSON.parse(jsnStr);
+      } catch { return; }
+
+      const idMatch = initLine.match(/initCDN(?:Series|Movies)Events\(\d+,\s*(\d+),/);
+      if (!idMatch) return;
+      const defaultTranslatorId = idMatch[1];
 
       // Find the translator name
       const transRegex = /data-translator_id="([^"]+)"[^>]*title="([^"]*)"/g;
@@ -221,12 +257,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           }
         }
       }
-
-      // Parse the embedded JSON to get stream URLs
-      let jsn;
-      try {
-        jsn = JSON.parse(initMatch[2]);
-      } catch { return; }
 
       if (!jsn.streams) return;
 
