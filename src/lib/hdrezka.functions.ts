@@ -31,17 +31,20 @@ export const searchHDRezka = createServerFn({ method: "POST" })
       const baseUrl = await getBaseUrl();
       const searchUrl = `${baseUrl}/engine/ajax/search.php?q=${encodeURIComponent(data.query)}`;
       const html = await fetchPage(searchUrl);
-      const $ = cheerio.load(html);
       const items: HdrezkaSearchItem[] = [];
-      $(".b-search__live_section > ul > li").each((_, el) => {
-        const link = $(el).find("a");
-        $(el).find("span.rating").remove();
+      const liRegex = /<li><a href="([^"]+)">(.*?)<\/a><\/li>/g;
+      let m;
+      while ((m = liRegex.exec(html)) !== null) {
+        const url = m[1];
+        const inner = m[2];
+        const titleMatch = inner.match(/<span class="enty">([^<]+)<\/span>/);
+        const title = titleMatch ? titleMatch[1].trim() : inner.replace(/<[^>]+>/g, "").trim();
         items.push({
-          title: $(el).find("span.enty").text() || link.text(),
-          url: link.attr("href") || "",
-          description: link.text(),
+          title,
+          url,
+          description: title,
         });
-      });
+      }
       return items;
     } catch {
       return [];

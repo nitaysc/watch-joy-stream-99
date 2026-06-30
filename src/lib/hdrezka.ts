@@ -10,7 +10,10 @@ const TIMEOUT = 5000;
 async function railFetch(url: string): Promise<Response | null> {
   try {
     const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(TIMEOUT) });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
+    const res = await fetch(proxyUrl, { signal: controller.signal });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     return res;
   } catch {
@@ -25,12 +28,15 @@ async function railPost(url: string, form: Record<string, string>): Promise<Resp
   if (r1 && r1.ok) return r1;
   // POST with body
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
     const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url, method: "POST", body: new URLSearchParams(form).toString() }),
-      signal: AbortSignal.timeout(TIMEOUT),
+      signal: controller.signal,
     });
+    clearTimeout(timeout);
     if (!res.ok) return null;
     return res;
   } catch {
