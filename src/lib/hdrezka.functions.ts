@@ -113,22 +113,58 @@ export const getHDRezkaVideo = createServerFn({ method: "POST" })
       let defaultTranslatorId = "";
 
       const htmlRaw = html;
-      const initMatch = reInitCDN.exec(htmlRaw);
-      if (initMatch) {
-        defaultTranslatorId = initMatch[1];
-        try {
-          const jsn = JSON.parse(initMatch[2]);
-          const decodedUrl = decodeStreamUrl(jsn.streams || "");
-          const formats = parseStreamFormats(decodedUrl);
-          defaultStream = {
-            url: decodedUrl,
-            formats,
-            thumbnails: jsn.thumbnails ? baseUrl + jsn.thumbnails : undefined,
-          };
-          if (jsn.subtitle && typeof jsn.subtitle === "string") {
-            defaultStream.subtitles = parseSubtitles(jsn.subtitle);
+      const lines = htmlRaw.split('\n');
+      const initLine = lines.find(l => l.includes('initCDNSeriesEvents(') || l.includes('initCDNMoviesEvents('));
+
+      if (initLine) {
+        const idMatch = initLine.match(/initCDN(?:Series|Movies)Events\(\d+,\s*(\d+),/);
+        if (idMatch) {
+          defaultTranslatorId = idMatch[1];
+        }
+
+        const jsonStart = initLine.indexOf('{"id":"cdnplayer"');
+        if (jsonStart !== -1) {
+          let braceCount = 0;
+          let endIdx = -1;
+          let inString = false;
+          let escapeNext = false;
+          
+          for (let i = jsonStart; i < initLine.length; i++) {
+            const char = initLine[i];
+            if (escapeNext) { escapeNext = false; continue; }
+            if (char === '\\') { escapeNext = true; continue; }
+            if (char === '"') { inString = !inString; continue; }
+            if (!inString) {
+              if (char === '{') braceCount++;
+              else if (char === '}') {
+                braceCount--;
+                if (braceCount === 0) {
+                  endIdx = i;
+                  break;
+                }
+              }
+            }
           }
-        } catch {}
+
+          if (endIdx !== -1) {
+            const jsnStr = initLine.substring(jsonStart, endIdx + 1);
+            try {
+              const jsn = JSON.parse(jsnStr);
+              const decodedUrl = decodeStreamUrl(jsn.streams || "");
+              const formats = parseStreamFormats(decodedUrl);
+              defaultStream = {
+                url: decodedUrl,
+                formats,
+                thumbnails: jsn.thumbnails ? baseUrl + jsn.thumbnails : undefined,
+              };
+              if (jsn.subtitle && typeof jsn.subtitle === "string") {
+                defaultStream.subtitles = parseSubtitles(jsn.subtitle);
+              }
+            } catch (e) {
+              console.error("HDRezka Server JSON parse failed", e);
+            }
+          }
+        }
       }
 
       translations.forEach((t) => {

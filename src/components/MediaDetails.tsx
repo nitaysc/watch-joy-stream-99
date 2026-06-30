@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Languages, Loader2 } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
+import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -174,185 +175,77 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     if (!title) return;
     setHdrezkaLoading(true);
     const currentId = ++hdrezkaFetchId.current;
-    const PROXY = "https://hdrezka-proxy.onrender.com/proxy";
+    const queries = [title];
 
     try {
-      console.log("HDRezka: Starting search for", title);
-      // Step 1: Search HDRezka via proxy (client-side fetch)
-      const searchUrl = `${PROXY}/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
-      const searchRes = await fetch(searchUrl);
-      if (!searchRes.ok || currentId !== hdrezkaFetchId.current) return;
-      const searchHtml = await searchRes.text();
+      for (const q of queries) {
+        if (currentId !== hdrezkaFetchId.current) return;
+        try {
+          const results = await searchHDRezka({ data: { query: q } });
+          if (currentId !== hdrezkaFetchId.current) return;
+          if (results.length === 0) continue;
 
-      // Parse search results using regex (browser-safe, no node-html-parser needed)
-      const itemRegex = /<div class="b-content__inline_item-link">[\s\S]*?<a href="([^"]+)">(.*?)<\/a>/g;
-      let match = itemRegex.exec(searchHtml);
-      if (!match) {
-        console.log("HDRezka: Search regex failed");
-        return;
-      }
-      const videoPageUrl = match[1]; // e.g. https://hdrezka-home.tv/series/drama/1730-pobeg-2005-latest.html
-      console.log("HDRezka: Found video page", videoPageUrl);
+          const video = await getHDRezkaVideo({ data: { url: results[0].url } });
+          if (currentId !== hdrezkaFetchId.current || !video) return;
+          if (video.translations.length === 0) continue;
 
-      // Step 2: Fetch the video page via proxy
-      const videoProxyUrl = videoPageUrl.replace(/^https?:\/\/[^\/]+/, PROXY);
-      console.log("HDRezka: Fetching video page via proxy");
-      const videoRes = await fetch(videoProxyUrl);
-      if (!videoRes.ok || currentId !== hdrezkaFetchId.current) return;
-      const videoHtml = await videoRes.text();
-      console.log("HDRezka: Video page fetched, length:", videoHtml.length);
+          const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
 
-      // Extract JSON payload using bracket matching
-      const lines = videoHtml.split('\n');
-      const initLine = lines.find(l => l.includes('initCDNSeriesEvents(') || l.includes('initCDNMoviesEvents('));
-      if (!initLine) {
-        console.log("HDRezka: initCDN line not found!");
-        return;
-      }
-      console.log("HDRezka: initCDN line found");
+          // First try: use the stream data already embedded in the page HTML (always works)
+          let hlsUrl = "";
+          let streamType = "application/x-mpegURL";
 
-      const jsonStart = initLine.indexOf('{"id":"cdnplayer"');
-      if (jsonStart === -1) {
-        console.log("HDRezka: JSON start not found!");
-        return;
-      }
-
-      let braceCount = 0;
-      let endIdx = -1;
-      let inString = false;
-      let escapeNext = false;
-      
-      for (let i = jsonStart; i < initLine.length; i++) {
-          const char = initLine[i];
-          if (escapeNext) { escapeNext = false; continue; }
-          if (char === '\\') { escapeNext = true; continue; }
-          if (char === '"') { inString = !inString; continue; }
-          if (!inString) {
-              if (char === '{') braceCount++;
-              else if (char === '}') {
-                  braceCount--;
-                  if (braceCount === 0) {
-                      endIdx = i;
-                      break;
-                  }
-              }
-          }
-      }
-      
-      if (endIdx === -1) {
-        console.log("HDRezka: JSON end not found!");
-        return;
-      }
-      const jsnStr = initLine.substring(jsonStart, endIdx + 1);
-
-      let jsn;
-      try {
-        jsn = JSON.parse(jsnStr);
-        console.log("HDRezka: JSON parsed successfully!");
-      } catch (e) { 
-        console.log("HDRezka: JSON parse failed", e);
-        return; 
-      }
-
-      const idMatch = initLine.match(/initCDN(?:Series|Movies)Events\(\d+,\s*(\d+),/);
-      if (!idMatch) {
-        console.log("HDRezka: ID match failed!");
-        return;
-      }
-      const defaultTranslatorId = idMatch[1];
-      console.log("HDRezka: Default translator ID", defaultTranslatorId);
-
-      // Find the translator name
-      const transRegex = /data-translator_id="([^"]+)"[^>]*title="([^"]*)"/g;
-      let translatorName = "Russian Dub";
-      let tm;
-      while ((tm = transRegex.exec(videoHtml)) !== null) {
-        if (tm[1] === defaultTranslatorId) {
-          translatorName = tm[2];
-          break;
-        }
-      }
-      if (translatorName === "Russian Dub") {
-        // Fallback: try another pattern
-        const transRegex2 = /data-translator_id="([^"]+)"[^>]*>([^<]+)/g;
-        while ((tm = transRegex2.exec(videoHtml)) !== null) {
-          if (tm[1] === defaultTranslatorId) {
-            translatorName = tm[2].trim();
-            break;
-          }
-        }
-      }
-
-      if (!jsn.streams) {
-        console.log("HDRezka: No streams in JSON!");
-        return;
-      }
-      console.log("HDRezka: Found streams in JSON");
-
-      // Decode streams (they may be base64 encoded with salt removal)
-      let streams = jsn.streams;
-      if (!streams.startsWith("[") && !streams.startsWith("http")) {
-        // Decode: remove #h prefix, strip known salts from //_// markers, then base64 decode
-        const knownSalts = ["IyMjI14hISMjIUBA","QEBAQEAhIyMhXl5e","JCQhIUAkJEBeIUAjJCRA","JCQjISFAIyFAIyM=","Xl5eIUAjIyEhIyM="];
-        let url = streams.replace(/^#h/, "");
-        for (let i = 0; i < 60 && url.includes("//_//"); i++) {
-          const idx = url.indexOf("//_//");
-          const after = url.slice(idx + 5);
-          let matched = false;
-          for (const salt of knownSalts) {
-            if (after.startsWith(salt)) {
-              url = url.slice(0, idx) + after.slice(salt.length);
-              matched = true;
-              break;
+          if (video.defaultStream) {
+            const bestKey = Object.keys(video.defaultStream.formats).find(k => k === "1080p")
+              || Object.keys(video.defaultStream.formats).find(k => k === "720p")
+              || Object.keys(video.defaultStream.formats).find(k => k === "480p")
+              || Object.keys(video.defaultStream.formats)[0];
+            if (bestKey) {
+              const best = video.defaultStream.formats[bestKey];
+              hlsUrl = best.hls || best.mp4;
+              if (!best.hls && best.mp4) streamType = "video/mp4";
             }
           }
-          if (!matched) {
-            url = url.slice(0, idx) + url.slice(Math.min(idx + 5 + 16, url.length));
+
+          // Fallback: try the POST endpoint (requires cookies)
+          if (!hlsUrl) {
+            const stream = await resolveStreamUrl({
+              data: {
+                videoId: video.id,
+                translatorId: translation.id,
+                season: season ? Number(season) : undefined,
+                episode: episode ? Number(episode) : undefined,
+              },
+            });
+            if (currentId !== hdrezkaFetchId.current || !stream) return;
+            hlsUrl = stream.hls || stream.mp4;
+            if (!stream.hls && stream.mp4) streamType = "video/mp4";
           }
+
+          if (!hlsUrl) return;
+
+          const hdSource: ServerSource = {
+            url: hlsUrl,
+            type: streamType,
+            quality: "1080p",
+            provider: { name: `HDRezka — ${translation.name}` },
+          };
+
+          setHdrezkaFound(true);
+          setTimeout(() => setHdrezkaFound(false), 15000);
+          
+          setSources((prev) => {
+            const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
+            if (existsIdx !== -1) {
+              return prev;
+            }
+            return [...prev, hdSource];
+          });
+          return;
+        } catch (e) {
+          console.error("HDRezka search failed for:", q, e);
         }
-        try { streams = atob(url); } catch { streams = url; }
       }
-
-      // Parse quality formats from the decoded stream string
-      const qualityRegex = /\[([^\]]+)\]/g;
-      const qualities: { quality: string; start: number; end: number }[] = [];
-      let qm;
-      while ((qm = qualityRegex.exec(streams)) !== null) {
-        qualities.push({ quality: qm[1], start: qm.index, end: qualityRegex.lastIndex });
-      }
-
-      let bestHls = "";
-      for (const q of qualities) {
-        if (q.quality.includes("prem")) continue; // Skip premium qualities
-        const nextStart = qualities.find(x => x.start > q.start)?.start ?? streams.length;
-        const urlStr = streams.slice(q.end, nextStart).replace(/,+$/, "").trim();
-        const urls = urlStr.split(" or ").map(u => u.trim()).filter(Boolean);
-        const hlsUrl = urls.find(u => u.endsWith(":hls:manifest.m3u8"));
-        if (hlsUrl && (q.quality === "1080p" || q.quality === "720p" || !bestHls)) {
-          bestHls = hlsUrl;
-          if (q.quality === "1080p") break; // 1080p is best, stop looking
-        }
-      }
-
-      if (!bestHls || currentId !== hdrezkaFetchId.current) {
-        console.log("HDRezka: No valid HLS stream extracted!");
-        return;
-      }
-      console.log("HDRezka: SUCCESS!", bestHls.substring(0, 50) + "...");
-
-      const hdSource: ServerSource = {
-        url: bestHls,
-        type: "application/x-mpegURL",
-        quality: "1080p",
-        provider: { name: `HDRezka — ${translatorName}` },
-      };
-
-      setSources((prev) => {
-        if (prev.some((s) => s.provider?.name?.startsWith("HDRezka"))) return prev;
-        return [...prev, hdSource];
-      });
-    } catch (e) {
-      console.error("HDRezka client-side search failed:", e);
     } finally {
       if (currentId === hdrezkaFetchId.current) {
         setHdrezkaLoading(false);
