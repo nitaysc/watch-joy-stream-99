@@ -18,7 +18,7 @@ export async function proxyFetch(url: string, _options?: RequestInit): Promise<R
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   try {
-    const res = await fetch(proxyTarget, { headers: HEADERS, signal: controller.signal });
+    const res = await fetch(proxyTarget, { headers: HEADERS, signal: controller.signal, cache: "no-store" });
     clearTimeout(timeout);
     if (res.ok) return res;
     throw new Error(`Direct fetch returned ${res.status} for ${url}`);
@@ -41,6 +41,7 @@ export async function proxyPost(url: string, form: Record<string, string>): Prom
       },
       body: new URLSearchParams(form).toString(),
       signal: controller.signal,
+      cache: "no-store",
     });
     clearTimeout(timeout);
     if (res.ok) return res;
