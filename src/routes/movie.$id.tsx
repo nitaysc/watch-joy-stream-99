@@ -40,7 +40,7 @@ function MoviePage() {
 
       <div className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
         <div className="animate-fade-in">
-          <MediaDetails id={id} mediaType="movie" poster={m.backdrop} />
+          <MediaDetails id={id} mediaType="movie" poster={m.backdrop} title={m.title} />
         </div>
 
         <div className="mt-10 grid gap-10 md:grid-cols-[220px_1fr]" style={{ animationDelay: "0.2s" }}>

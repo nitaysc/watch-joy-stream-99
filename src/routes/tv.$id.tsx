@@ -65,6 +65,7 @@ function TvPage() {
             poster={m.backdrop}
             season={String(season)}
             episode={String(episode)}
+            title={m.title}
             episodeInfo={`S${season} · E${episode}`}
             onPrevEpisode={prevEpisode ? () => { setEpisode(prevEpisode.episode_number); } : undefined}
             onNextEpisode={nextEpisode ? () => { setEpisode(nextEpisode.episode_number); } : undefined}

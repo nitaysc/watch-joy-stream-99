@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
+import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -13,6 +14,7 @@ interface MediaDetailsProps {
   episodeInfo?: string;
   onPrevEpisode?: () => void;
   onNextEpisode?: () => void;
+  title?: string;
 }
 
 interface Source {
@@ -76,7 +78,7 @@ function sortSources(a: Source, b: Source): number {
   return (isNaN(qb) ? 0 : qb) - (isNaN(qa) ? 0 : qa);
 }
 
-export default function MediaDetails({ id, mediaType, poster, season, episode, episodeInfo, onPrevEpisode, onNextEpisode }: MediaDetailsProps) {
+export default function MediaDetails({ id, mediaType, poster, season, episode, episodeInfo, onPrevEpisode, onNextEpisode, title }: MediaDetailsProps) {
   const [streamUrl, setStreamUrl] = useState<string | null>(null);
   const [streamType, setStreamType] = useState<string>("application/x-mpegURL");
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +87,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchId = useRef(0);
   const subFetchId = useRef(0);
+  const hdrezkaFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
 
   const applySources = (sorted: Source[]) => {
@@ -160,6 +163,58 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       })));
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
+
+  // Fetch HDRezka sources for Russian dubs
+  useEffect(() => {
+    const currentId = ++hdrezkaFetchId.current;
+    const searchQuery = title || String(id);
+    if (!searchQuery) return;
+
+    (async () => {
+      try {
+        const results = await searchHDRezka({ data: { query: searchQuery } });
+        if (currentId !== hdrezkaFetchId.current || results.length === 0) return;
+
+        const video = await getHDRezkaVideo({ data: { url: results[0].url } });
+        if (currentId !== hdrezkaFetchId.current || !video || video.translations.length === 0) return;
+
+        // Resolve first default/russian translation
+        const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
+        const stream = await resolveStreamUrl({
+          data: {
+            videoId: video.id,
+            translatorId: translation.id,
+            season: season ? Number(season) : undefined,
+            episode: episode ? Number(episode) : undefined,
+          },
+        });
+        if (currentId !== hdrezkaFetchId.current || !stream) return;
+
+        const hlsUrl = stream.hls || stream.mp4;
+        if (!hlsUrl) return;
+
+        const hdSource: ServerSource = {
+          url: hlsUrl,
+          type: stream.hls ? "application/x-mpegURL" : "video/mp4",
+          quality: "1080p",
+          provider: { name: `HDRezka — ${translation.name}` },
+        };
+
+        setSources((prev) => {
+          if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
+          const updated = [...prev, hdSource];
+          if (updated.length > 0 && prev.length === 0) {
+            setStreamUrl(updated[0].url);
+            setStreamType(updated[0].type);
+            setActiveIdx(0);
+          }
+          return updated;
+        });
+      } catch {
+        // HDRezka unavailable — non-blocking
+      }
+    })();
+  }, [id, mediaType, season, episode, title]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
