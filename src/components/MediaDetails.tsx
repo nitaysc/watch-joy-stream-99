@@ -3,6 +3,7 @@ import { RefreshCw } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
+import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
 import EmbedOverlay from "@/components/EmbedOverlay";
 
 interface MediaDetailsProps {
@@ -170,7 +171,8 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
       : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
 
-<<<<<<< HEAD
+  useEffect(() => {
+    const currentId = hdrezkaFetchId.current;
     (async () => {
       try {
         const results = await searchHDRezka({ data: { query: searchQuery } });
