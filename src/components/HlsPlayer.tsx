@@ -469,7 +469,7 @@ export default function HlsPlayer({
       onClick={togglePlay}
     >
       {poster && (
-        <div className="pointer-events-none absolute inset-0 opacity-20 transition-opacity duration-700">
+        <div className={`pointer-events-none absolute inset-0 transition-opacity duration-700 ${loading ? 'opacity-60' : 'opacity-20'}`}>
           <img src={poster} alt="" className="h-full w-full scale-150 object-cover blur-3xl" />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent" />
         </div>
