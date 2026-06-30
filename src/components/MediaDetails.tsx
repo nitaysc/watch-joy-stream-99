@@ -1,10 +1,9 @@
 import { useState, useEffect, useRef } from "react";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Languages } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
 import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
-import EmbedOverlay from "@/components/EmbedOverlay";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -89,7 +88,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const fetchId = useRef(0);
   const subFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
-  const [embedOpen, setEmbedOpen] = useState<null | { src: string; title: string }>(null);
+  const [hdrezkaFound, setHdrezkaFound] = useState(false);
   const hdrezkaFetchId = useRef(0);
   const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
 
@@ -167,17 +166,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
 
-  // Build Russian dub embed URL (vidsrc.cc provides multi-language audio incl. Russian)
-  const russianEmbedUrl =
-    mediaType === "tv"
-      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
-      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
-
   useEffect(() => {
+    if (!title) return;
     const currentId = hdrezkaFetchId.current;
     (async () => {
       try {
-        const results = await searchHDRezka({ data: { query: searchQuery } });
+        const results = await searchHDRezka({ data: { query: title } });
         if (currentId !== hdrezkaFetchId.current || results.length === 0) return;
 
         const video = await getHDRezkaVideo({ data: { url: results[0].url } });
@@ -296,30 +290,25 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                   <RefreshCw className="h-3 w-3" /> Try again
                 </button>
                 <span className="text-[10px] text-white/20">or</span>
-                <button
-                  onClick={() => setEmbedOpen({ src: russianEmbedUrl, title: "Russian Dub — vidsrc" })}
-                  className="flex items-center gap-1.5 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs text-green-400 ring-1 ring-green-500/20 hover:bg-green-500/20"
-                >
-                  Open Russian Dub
-                </button>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {/* Russian dub (always visible below player) — opens working iframe embed */}
-      <div className="mt-3 text-center">
-        <button
-          onClick={() => setEmbedOpen({ src: russianEmbedUrl, title: "Russian Dub — vidsrc" })}
-          className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
-        >
-          🎧 Russian Dub
-        </button>
-      </div>
-
-      {embedOpen && (
-        <EmbedOverlay src={embedOpen.src} title={embedOpen.title} onClose={() => setEmbedOpen(null)} />
+      {/* Russian dub source selector */}
+      {streamUrl && hdrezkaFound && (
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => {
+              const ruIdx = sources.findIndex((s) => s.provider?.name?.includes("HDRezka"));
+              if (ruIdx >= 0) handleSourceChange(ruIdx);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
+          >
+            <Languages className="h-3.5 w-3.5" /> Russian Dub
+          </button>
+        </div>
       )}
     </div>
   );
