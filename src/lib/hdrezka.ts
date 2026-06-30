@@ -4,60 +4,47 @@ const CINEPRO_BASE = "https://core-production-ef8a.up.railway.app";
 const TIMEOUT = 5000;
 
 /* ------------------------------------------------------------------ */
-/*  Railway proxy helpers                                             */
+/*  Direct fetch helpers                                              */
 /* ------------------------------------------------------------------ */
 
-async function railFetch(url: string): Promise<Response | null> {
-  try {
-    const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
-    const res = await fetch(proxyUrl, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!res.ok) return null;
-    return res;
-  } catch {
-    return null;
-  }
-}
-
-async function railPost(url: string, form: Record<string, string>): Promise<Response | null> {
-  // GET-style with form as query params
-  const fullUrl = `${url}&${new URLSearchParams(form).toString()}`;
-  const r1 = await railFetch(fullUrl);
-  if (r1 && r1.ok) return r1;
-  // POST with body
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), TIMEOUT);
-    const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url, method: "POST", body: new URLSearchParams(form).toString() }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeout);
-    if (!res.ok) return null;
-    return res;
-  } catch {
-    return null;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Exported fetch helpers                                            */
-/* ------------------------------------------------------------------ */
+const HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+};
 
 export async function proxyFetch(url: string, _options?: RequestInit): Promise<Response> {
-  const res = await railFetch(url);
-  if (res) return res;
-  throw new Error(`Railway proxy returned no response for ${url}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT);
+  try {
+    const res = await fetch(url, { headers: HEADERS, signal: controller.signal });
+    clearTimeout(timeout);
+    if (res.ok) return res;
+    throw new Error(`Direct fetch returned ${res.status} for ${url}`);
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 export async function proxyPost(url: string, form: Record<string, string>): Promise<Response> {
-  const res = await railPost(url, form);
-  if (res) return res;
-  throw new Error(`Railway proxy POST failed for ${url}`);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT);
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        ...HEADERS,
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(form).toString(),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (res.ok) return res;
+    throw new Error(`Direct POST returned ${res.status} for ${url}`);
+  } catch (e) {
+    clearTimeout(timeout);
+    throw e;
+  }
 }
 
 /* ------------------------------------------------------------------ */

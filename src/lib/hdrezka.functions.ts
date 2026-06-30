@@ -21,30 +21,7 @@ const reInitCDN = /initCDN(?:Series|Movies)Events\(\d+,\s(\d+),.+?(\{.*?\})\);/;
 async function fetchPage(url: string): Promise<string> {
   const res = await proxyFetch(url);
   if (!res.ok) throw new Error(`HDRezka page returned ${res.status}`);
-  let text = await res.text();
-  
-  // The Railway proxy aggressively replaces what it thinks are relative URLs.
-  // We extract the original HTML by decoding the URL inside the data parameter!
-  const m = text.match(/\/v1\/proxy\?data=([^"'\s<>]+)/g);
-  if (m && m.length > 0) {
-    for (const matchStr of m) {
-      try {
-        const dataStr = matchStr.replace('/v1/proxy?data=', '');
-        const decoded = decodeURIComponent(dataStr);
-        const obj = JSON.parse(decoded);
-        let originalUrl = obj.url as string;
-        const ajaxIdx = originalUrl.indexOf('/engine/ajax/');
-        if (ajaxIdx !== -1) {
-          const htmlPart = originalUrl.slice(ajaxIdx + '/engine/ajax/'.length);
-          const decodedHtml = decodeURIComponent(htmlPart);
-          text = text.replace(matchStr, decodedHtml);
-        }
-      } catch (e) {
-        // Ignore parsing errors for individual matches
-      }
-    }
-  }
-  return text;
+  return await res.text();
 }
 
 export const searchHDRezka = createServerFn({ method: "POST" })
