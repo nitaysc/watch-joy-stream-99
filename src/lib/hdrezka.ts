@@ -10,28 +10,33 @@ async function tryRailwayProxy(
   url: string,
   options?: RequestInit & { form?: Record<string, string> },
 ): Promise<Response | null> {
+  // GET with bare URL (no custom headers — proxy uses its own)
   try {
-    const data: Record<string, any> = { url };
-    if (options?.headers) data.headers = options.headers;
-    if (options?.form) data.form = options.form;
-    const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify(data))}`;
+    const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
     const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
     if (res.ok) return res;
   } catch {}
 
+  // POST with bare URL
   try {
-    const body: Record<string, any> = { url };
-    if (options?.headers) body.headers = options.headers;
-    if (options?.form) body.form = options.form;
-    if (options?.method === "POST") body.method = "POST";
     const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ url }),
       signal: AbortSignal.timeout(10000),
     });
     if (res.ok) return res;
   } catch {}
+
+  // GET with URL + form data (for CDN POST fallback)
+  if (options?.form) {
+    try {
+      const fullUrl = `${url}&${new URLSearchParams(options.form).toString()}`;
+      const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url: fullUrl }))}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      if (res.ok) return res;
+    } catch {}
+  }
 
   return null;
 }
