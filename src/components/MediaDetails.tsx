@@ -203,22 +203,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         </div>
       )}
 
-      {/* HDRezka Russian dub notification */}
-      {hdrezkaFound && (
-        <div className="mb-2 animate-fade-in">
-          <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2 text-xs text-green-400 backdrop-blur-sm">
-            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-[10px]">🎧</span>
-            <span className="flex-1">Russian dub found via HDRezka — click <strong>Server</strong> in player to switch</span>
-            <button
-              onClick={() => setHdrezkaFound(false)}
-              className="rounded-lg bg-white/5 px-2 py-1 text-[10px] text-white/40 hover:text-white/70"
-            >
-              Dismiss
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
@@ -263,14 +247,10 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                 </button>
                 <span className="text-[10px] text-white/20">or</span>
                 <button
-                  onClick={() => {
-                    setError(null);
-                    setHdrezkaFound(false);
-                    setHdrezkaRetry((c) => c + 1);
-                  }}
+                  onClick={() => setEmbedOpen({ src: russianEmbedUrl, title: "Russian Dub — vidsrc" })}
                   className="flex items-center gap-1.5 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs text-green-400 ring-1 ring-green-500/20 hover:bg-green-500/20"
                 >
-                  Find Russian Dub (HDRezka)
+                  Open Russian Dub
                 </button>
               </div>
             )}
@@ -278,20 +258,20 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
-      {/* HDRezka — try Russian dub (always visible below player) */}
-      {streamUrl && (
-        <div className="mt-3 text-center">
-          <button
-            onClick={() => {
-              setHdrezkaFound(false);
-              setHdrezkaRetry((c) => c + 1);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
-          >
-            Try Russian Dub (HDRezka)
-          </button>
-        </div>
+      {/* Russian dub (always visible below player) — opens working iframe embed */}
+      <div className="mt-3 text-center">
+        <button
+          onClick={() => setEmbedOpen({ src: russianEmbedUrl, title: "Russian Dub — vidsrc" })}
+          className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
+        >
+          🎧 Russian Dub
+        </button>
+      </div>
+
+      {embedOpen && (
+        <EmbedOverlay src={embedOpen.src} title={embedOpen.title} onClose={() => setEmbedOpen(null)} />
       )}
     </div>
   );
 }
+
