@@ -67,14 +67,23 @@ export const searchSubtitles = createServerFn({ method: "GET" })
     if (!res.ok) return [];
 
     const json: SubSearchResponse = await res.json();
-    return json.data.map((item) => ({
-      file_id: item.attributes.files?.[0]?.file_id ?? 0,
-      language: item.attributes.language,
-      language_english_name: item.attributes.language_english_name || item.attributes.language || "Unknown",
-      hearing_impaired: !!item.attributes.hearing_impaired,
-      file_name: item.attributes.files?.[0]?.file_name ?? "",
-      fps: item.attributes.fps,
-    })).filter((s) => s.file_id > 0);
+    const seen = new Set<string>();
+    return json.data.reduce((acc, item) => {
+      const lang = item.attributes.language;
+      if (seen.has(lang)) return acc;
+      seen.add(lang);
+      const fileId = item.attributes.files?.[0]?.file_id ?? item.attributes.subtitle_id;
+      if (!fileId) return acc;
+      acc.push({
+        file_id: Number(fileId),
+        language: lang,
+        language_english_name: item.attributes.language_english_name || lang || "Unknown",
+        hearing_impaired: !!item.attributes.hearing_impaired,
+        file_name: item.attributes.files?.[0]?.file_name ?? "",
+        fps: item.attributes.fps,
+      });
+      return acc;
+    }, [] as SubtitleResult[]);
   });
 
 export const getSubtitleVtt = createServerFn({ method: "GET" })
