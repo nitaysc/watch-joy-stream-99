@@ -207,14 +207,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         setTimeout(() => setHdrezkaFound(false), 8000);
         setSources((prev) => {
           if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
-          const updated = [...prev, hdSource];
-          if (updated.length > 0 && prev.length === 0) {
-            setStreamUrl(updated[0].url);
-            setStreamType(updated[0].type);
-            setActiveIdx(0);
-          }
-          return updated;
+          return [...prev, hdSource];
         });
+        setStreamUrl((prev) => prev ? prev : hdSource.url);
+        setStreamType((prev) => prev ? prev : hdSource.type);
+        setActiveIdx((prev) => streamUrl ? prev : 0);
       } catch {
         // HDRezka unavailable — non-blocking
       }
@@ -314,9 +311,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                 <span className="text-[10px] text-white/20">or</span>
                 <button
                   onClick={() => {
-                    fetchStreams();
-                    // HDRezka is auto-searched in a useEffect
-                    setTimeout(() => setHdrezkaFound(true), 3000);
+                    setError(null);
+                    setHdrezkaFound(false);
+                    setHdrezkaRetry((c) => c + 1);
                   }}
                   className="flex items-center gap-1.5 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs text-green-400 ring-1 ring-green-500/20 hover:bg-green-500/20"
                 >
