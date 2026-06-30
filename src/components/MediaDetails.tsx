@@ -208,13 +208,20 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         setHdrezkaFound(true);
         setHdrezkaLoading(false);
         setTimeout(() => setHdrezkaFound(false), 15000);
+        
         setSources((prev) => {
-          if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
-          return [...prev, hdSource];
+          const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
+          if (existsIdx !== -1) {
+            setActiveIdx(existsIdx);
+            return prev;
+          }
+          const newSources = [...prev, hdSource];
+          setActiveIdx(newSources.length - 1);
+          return newSources;
         });
-        setStreamUrl((prev) => prev ? prev : hdSource.url ?? null);
-        setStreamType((prev) => prev ? prev : hdSource.type ?? "application/x-mpegURL");
-        setActiveIdx((prev) => streamUrl ? prev : 0);
+        
+        setStreamUrl(hdSource.url ?? null);
+        setStreamType(hdSource.type ?? "application/x-mpegURL");
         return;
       } catch (e) {
         console.error("HDRezka search failed for:", q, e);
