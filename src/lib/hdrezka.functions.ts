@@ -27,29 +27,25 @@ async function fetchPage(url: string): Promise<string> {
 export const searchHDRezka = createServerFn({ method: "POST" })
   .inputValidator((d: { query: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaSearchItem[]> => {
-    try {
-      const baseUrl = await getBaseUrl();
-      const searchUrl = `${baseUrl}/search/?do=search&subaction=search&q=${encodeURIComponent(data.query)}`;
-      const html = await fetchPage(searchUrl);
-      const items: HdrezkaSearchItem[] = [];
-      
-      const itemRegex = /<div class="b-content__inline_item-link">[\s\S]*?<a href="([^"]+)">(.*?)<\/a>/g;
-      let m;
-      while ((m = itemRegex.exec(html)) !== null) {
-        const url = m[1];
-        const inner = m[2];
-        const titleMatch = inner.match(/<span class="enty">([^<]+)<\/span>/);
-        const title = titleMatch ? titleMatch[1].trim() : inner.replace(/<[^>]+>/g, "").trim();
-        items.push({
-          title,
-          url,
-          description: title,
-        });
-      }
-      return items;
-    } catch {
-      return [];
+    const baseUrl = await getBaseUrl();
+    const searchUrl = `${baseUrl}/search/?do=search&subaction=search&q=${encodeURIComponent(data.query)}`;
+    const html = await fetchPage(searchUrl);
+    const items: HdrezkaSearchItem[] = [];
+    
+    const itemRegex = /<div class="b-content__inline_item-link">[\s\S]*?<a href="([^"]+)">(.*?)<\/a>/g;
+    let m;
+    while ((m = itemRegex.exec(html)) !== null) {
+      const url = m[1];
+      const inner = m[2];
+      const titleMatch = inner.match(/<span class="enty">([^<]+)<\/span>/);
+      const title = titleMatch ? titleMatch[1].trim() : inner.replace(/<[^>]+>/g, "").trim();
+      items.push({
+        title,
+        url,
+        description: title,
+      });
     }
+    return items;
   });
 
 export const getHDRezkaVideo = createServerFn({ method: "POST" })
