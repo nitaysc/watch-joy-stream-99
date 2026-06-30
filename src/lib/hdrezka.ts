@@ -6,15 +6,35 @@ const CINEPRO_BASE = "https://core-production-ef8a.up.railway.app";
 /*  Proxy helpers                                                     */
 /* ------------------------------------------------------------------ */
 
+function extractProxyResponse(text: string): string | null {
+  // Response body is: /v1/proxy?data=URL_ENCODED_JSON
+  const m = text.match(/\/v1\/proxy\?data=(.+)$/);
+  if (!m) return null;
+  try {
+    const decoded = decodeURIComponent(m[1]);
+    const obj = JSON.parse(decoded);
+    const raw = obj.url as string;
+    // The url field has format: https://<actual_content>
+    const sepIdx = raw.indexOf("//");
+    return sepIdx !== -1 ? raw.slice(sepIdx + 2) : raw;
+  } catch {
+    return null;
+  }
+}
+
 async function tryRailwayProxy(
   url: string,
   options?: RequestInit & { form?: Record<string, string> },
 ): Promise<Response | null> {
-  // GET with bare URL (no custom headers — proxy uses its own)
+  // GET with bare URL
   try {
     const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-    if (res.ok) return res;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const text = await res.text();
+      const content = extractProxyResponse(text);
+      if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
+    }
   } catch {}
 
   // POST with bare URL
@@ -23,18 +43,26 @@ async function tryRailwayProxy(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ url }),
-      signal: AbortSignal.timeout(10000),
+      signal: AbortSignal.timeout(15000),
     });
-    if (res.ok) return res;
+    if (res.ok) {
+      const text = await res.text();
+      const content = extractProxyResponse(text);
+      if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
+    }
   } catch {}
 
-  // GET with URL + form data (for CDN POST fallback)
+  // GET with form data appended to URL (for CDN POST fallback)
   if (options?.form) {
     try {
       const fullUrl = `${url}&${new URLSearchParams(options.form).toString()}`;
       const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url: fullUrl }))}`;
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
-      if (res.ok) return res;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (res.ok) {
+        const text = await res.text();
+        const content = extractProxyResponse(text);
+        if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
+      }
     } catch {}
   }
 
@@ -105,17 +133,31 @@ export async function proxyPost(
   url: string,
   form: Record<string, string>,
 ): Promise<Response> {
-  const railRes = await tryRailwayProxy(url, { ...({ form } as any), method: "POST" });
+  // 1) Try Railway proxy — pass form data as query params (GET-style)
+  const railRes = await tryRailwayProxy(url, { form });
   if (railRes) return railRes;
 
-  const aoRes = await tryAllorigins(`${url}&${new URLSearchParams(form).toString()}`);
-  if (aoRes) {
-    return new Response(await aoRes.text(), {
-      status: 200,
-      headers: { "content-type": "application/json" },
+  // 2) Try Railway proxy with POST body in the proxy request
+  try {
+    const body = JSON.stringify({ url, method: "POST", body: new URLSearchParams(form).toString() });
+    const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+      signal: AbortSignal.timeout(15000),
     });
-  }
+    if (res.ok) {
+      const text = await res.text();
+      const content = extractProxyResponse(text);
+      if (content) return new Response(content, { status: 200, headers: { "content-type": "application/json" } });
+    }
+  } catch {}
 
+  // 3) Try allorigins with form data appended as query params
+  const aoRes = await tryAllorigins(`${url}&${new URLSearchParams(form).toString()}`);
+  if (aoRes) return aoRes;
+
+  // 4) Try direct POST (will likely fail from CF Workers)
   const directRes = await tryDirect(url, {
     method: "POST",
     headers: {
