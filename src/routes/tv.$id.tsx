@@ -43,7 +43,7 @@ function TvPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <MediaDetails id={tvId} mediaType="tv" poster={m.backdrop} season={String(season)} episode={String(episode)} />
+      <MediaDetails id={tvId} mediaType="tv" poster={m.backdrop} season={String(season)} episode={String(episode)} title={m.title} />
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <div className="relative">

@@ -30,7 +30,7 @@ function MoviePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-6 sm:py-10">
-      <MediaDetails id={id} mediaType="movie" poster={m.backdrop} />
+      <MediaDetails id={id} mediaType="movie" poster={m.backdrop} title={m.title} />
 
       <div className="mt-8 grid gap-8 md:grid-cols-[200px_1fr]">
         {m.poster && (
