@@ -7,29 +7,12 @@ const TIMEOUT = 5000;
 /*  Railway proxy helpers                                             */
 /* ------------------------------------------------------------------ */
 
-function extractProxyResponse(text: string): string | null {
-  const m = text.match(/\/v1\/proxy\?data=(.+)$/);
-  if (!m) return null;
-  try {
-    const decoded = decodeURIComponent(m[1]);
-    const obj = JSON.parse(decoded);
-    const raw = obj.url as string;
-    const sepIdx = raw.indexOf("//");
-    return sepIdx !== -1 ? raw.slice(sepIdx + 2) : raw;
-  } catch {
-    return null;
-  }
-}
-
 async function railFetch(url: string): Promise<Response | null> {
   try {
     const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
     const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(TIMEOUT) });
     if (!res.ok) return null;
-    const text = await res.text();
-    const content = extractProxyResponse(text);
-    if (!content) return null;
-    return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
+    return res;
   } catch {
     return null;
   }
@@ -39,7 +22,7 @@ async function railPost(url: string, form: Record<string, string>): Promise<Resp
   // GET-style with form as query params
   const fullUrl = `${url}&${new URLSearchParams(form).toString()}`;
   const r1 = await railFetch(fullUrl);
-  if (r1) return r1;
+  if (r1 && r1.ok) return r1;
   // POST with body
   try {
     const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
@@ -49,10 +32,7 @@ async function railPost(url: string, form: Record<string, string>): Promise<Resp
       signal: AbortSignal.timeout(TIMEOUT),
     });
     if (!res.ok) return null;
-    const text = await res.text();
-    const content = extractProxyResponse(text);
-    if (!content) return null;
-    return new Response(content, { status: 200, headers: { "content-type": "application/json" } });
+    return res;
   } catch {
     return null;
   }
