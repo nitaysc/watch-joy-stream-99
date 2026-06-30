@@ -1,9 +1,8 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { X, RefreshCw } from "lucide-react";
 
 const FALLBACK_EMBEDS: Record<string, string[]> = {
   "vidsrc.cc": [
-    "vidsrc.cc",
     "vidsrc.to",
     "vidsrc.me",
     "2embed.cc",
@@ -26,31 +25,52 @@ interface EmbedOverlayProps {
   onClose: () => void;
 }
 
+const LOAD_TIMEOUT = 8000;
+
 export default function EmbedOverlay({ src, title, onClose }: EmbedOverlayProps) {
   const [currentSrc, setCurrentSrc] = useState(src);
   const [failed, setFailed] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const fallbacks = getFallbackUrls(src);
   const fallbackIdx = useRef(-1);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const handleError = useCallback(() => {
+  const tryFallback = useCallback(() => {
     const nextIdx = fallbackIdx.current + 1;
     if (nextIdx < fallbacks.length) {
       fallbackIdx.current = nextIdx;
       setCurrentSrc(fallbacks[nextIdx]);
       setFailed(false);
       setErrorMsg(null);
+      setLoading(true);
     } else {
       setFailed(true);
+      setLoading(false);
       setErrorMsg("Embed service unavailable. Try again later or use another source.");
     }
   }, [fallbacks]);
+
+  const handleLoad = useCallback(() => {
+    clearTimeout(timeoutRef.current);
+    setLoading(false);
+    setFailed(false);
+  }, []);
+
+  useEffect(() => {
+    if (failed) return;
+    timeoutRef.current = setTimeout(() => {
+      tryFallback();
+    }, LOAD_TIMEOUT);
+    return () => clearTimeout(timeoutRef.current);
+  }, [currentSrc, failed, tryFallback]);
 
   const retry = useCallback(() => {
     fallbackIdx.current = -1;
     setCurrentSrc(src);
     setFailed(false);
     setErrorMsg(null);
+    setLoading(true);
   }, [src]);
 
   return (
@@ -65,7 +85,7 @@ export default function EmbedOverlay({ src, title, onClose }: EmbedOverlayProps)
             <X className="h-3.5 w-3.5" /> Close
           </button>
         </div>
-        <div className="aspect-video w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl">
+        <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl">
           {failed ? (
             <div className="flex h-full flex-col items-center justify-center gap-4 p-8">
               <span className="text-sm text-red-400">{errorMsg}</span>
@@ -77,15 +97,22 @@ export default function EmbedOverlay({ src, title, onClose }: EmbedOverlayProps)
               </button>
             </div>
           ) : (
-            <iframe
-              key={currentSrc}
-              src={currentSrc}
-              className="h-full w-full"
-              allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
-              allowFullScreen
-              referrerPolicy="no-referrer"
-              onError={handleError}
-            />
+            <>
+              {loading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-black/60">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                </div>
+              )}
+              <iframe
+                key={currentSrc}
+                src={currentSrc}
+                className="h-full w-full"
+                allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope"
+                allowFullScreen
+                referrerPolicy="no-referrer"
+                onLoad={handleLoad}
+              />
+            </>
           )}
         </div>
       </div>
