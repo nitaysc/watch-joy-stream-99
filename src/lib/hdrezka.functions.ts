@@ -25,7 +25,7 @@ async function fetchPage(url: string): Promise<string> {
   
   // The Railway proxy aggressively replaces what it thinks are relative URLs.
   // We extract the original HTML by decoding the URL inside the data parameter!
-  const m = text.match(/\/v1\/proxy\?data=([A-Za-z0-9%_\-]+)/g);
+  const m = text.match(/\/v1\/proxy\?data=([^"'\s<>]+)/g);
   if (m && m.length > 0) {
     for (const matchStr of m) {
       try {
