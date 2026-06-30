@@ -4,6 +4,7 @@ import {
   getBaseUrl,
   buildHeaders,
   cdnPost,
+  proxyFetch,
   decodeStreamUrl,
   parseStreamFormats,
   parseSubtitles,
@@ -19,7 +20,7 @@ import type {
 const reInitCDN = /initCDN(?:Series|Movies)Events\(\d+,\s(\d+),.+?(\{.*?\})\);/;
 
 async function fetchPage(url: string): Promise<string> {
-  const res = await fetch(url, {
+  const res = await proxyFetch(url, {
     headers: buildHeaders(),
     signal: AbortSignal.timeout(15000),
   });
