@@ -63,7 +63,7 @@ export default function HlsPlayer({
   const playerRef = useRef<ReturnType<typeof videojs> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const progressRef = useRef<HTMLDivElement>(null);
-  const hideTimer = useRef<ReturnType<typeof setTimeout>>();
+  const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const menuOpenRef = useRef(false);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -95,7 +95,7 @@ export default function HlsPlayer({
   const handleMouseMove = useCallback(() => {
     setShowControls(true);
     if (playing) {
-      clearTimeout(hideTimer.current);
+      clearTimeout(hideTimer.current!);
       hideTimer.current = setTimeout(() => {
         if (!menuOpenRef.current) setShowControls(false);
       }, 3000);
@@ -150,7 +150,7 @@ export default function HlsPlayer({
     if (tt) {
       const list: { kind: string; label: string; language: string; mode: string }[] = [];
       for (let i = 0; i < tt.length; i++) {
-        const t = tt[i];
+        const t = (tt as any)[i] as TextTrack;
         list.push({ kind: t.kind, label: t.label || t.language || `Track ${i + 1}`, language: t.language, mode: t.mode });
       }
       setTracks(list);
@@ -159,7 +159,7 @@ export default function HlsPlayer({
     if (at) {
       const list: { label: string; language: string; enabled: boolean }[] = [];
       for (let i = 0; i < at.length; i++) {
-        const t = at[i];
+        const t = (at as any)[i];
         list.push({ label: t.label || t.language || `Audio ${i + 1}`, language: t.language, enabled: t.enabled });
       }
       setAudioTracks(list);
@@ -168,9 +168,9 @@ export default function HlsPlayer({
 
   const refreshQualityLevels = useCallback(() => {
     const p = playerRef.current;
-    if (!p?.qualityLevels) return;
+    if (!(p as any)?.qualityLevels) return;
     try {
-      const ql = p.qualityLevels();
+      const ql = (p as any).qualityLevels();
       const levels: { height: number; label: string }[] = [];
       for (let i = 0; i < ql.length; i++) {
         const h = ql[i]?.height;
@@ -185,9 +185,9 @@ export default function HlsPlayer({
     setQuality(q);
     setShowQualityMenu(false);
     const p = playerRef.current;
-    if (!p?.qualityLevels) return;
+    if (!(p as any).qualityLevels) return;
     try {
-      const ql = p.qualityLevels();
+      const ql = (p as any).qualityLevels();
       if (q === "Auto") {
         ql.selectedIndex_ = -1;
       } else {
@@ -221,7 +221,7 @@ export default function HlsPlayer({
     // Toggle off if already active
     if (activeExternal.current === fileId) {
       const existing = getExternalTrackEl(fileId);
-      if (existing) existing.mode = "disabled";
+      if (existing) (existing as any).mode = "disabled";
       activeExternal.current = null;
       setShowCcm(false);
       return;
@@ -229,15 +229,15 @@ export default function HlsPlayer({
 
     // Disable all embedded tracks
     const tt = p.textTracks();
-    for (let i = 0; i < tt.length; i++) tt[i].mode = "disabled";
+    for (let i = 0; i < tt.length; i++) (tt as any)[i].mode = "disabled";
 
     // Disable other external tracks
-    for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+    for (const t of externalTrackRefs.current) (t.el as any).mode = "disabled";
 
     // Check if already loaded
     const existing = getExternalTrackEl(fileId);
     if (existing) {
-      existing.mode = "showing";
+      (existing as any).mode = "showing";
       activeExternal.current = fileId;
       setShowCcm(false);
       return;
@@ -277,7 +277,7 @@ export default function HlsPlayer({
       // Re-initialize text tracks
       const newTt = p.textTracks();
       for (let i = 0; i < newTt.length; i++) {
-        newTt[i].mode = newTt[i] === trackEl.track ? "showing" : "disabled";
+        (newTt as any)[i].mode = (newTt as any)[i] === trackEl.track ? "showing" : "disabled";
       }
     }
 
@@ -367,10 +367,10 @@ export default function HlsPlayer({
       },
     });
 
-    player.el().style.setProperty("width", "100%", "important");
-    player.el().style.setProperty("height", "100%", "important");
+    (player.el() as HTMLElement).style.setProperty("width", "100%", "important");
+    (player.el() as HTMLElement).style.setProperty("height", "100%", "important");
 
-    player.qualityLevels();
+    (player as any).qualityLevels();
     player.src({ src, type });
 
     player.on("play", () => setPlaying(true));
@@ -391,14 +391,14 @@ export default function HlsPlayer({
       const at = player.audioTracks?.();
       if (at) {
         for (let i = 0; i < at.length; i++) {
-          if (at[i].language === "eng" || at[i].label?.toLowerCase().includes("english")) {
-            at[i].enabled = true;
+          if ((at as any)[i].language === "eng" || (at as any)[i].label?.toLowerCase().includes("english")) {
+            (at as any)[i].enabled = true;
             break;
           }
         }
         // If no English found, enable the first track
-        if (at.length > 0 && !Array.from(at).some((t: any) => t.enabled)) {
-          at[0].enabled = true;
+        if (at.length > 0 && !Array.from(at as any).some((t: any) => t.enabled)) {
+          (at as any)[0].enabled = true;
         }
       }
     });
@@ -411,7 +411,7 @@ export default function HlsPlayer({
       if (b.length > 0) setBuffered(b.end(b.length - 1));
     });
     player.on("qualitylevelschange", () => {
-      const ql = player.qualityLevels();
+      const ql = (player as any).qualityLevels();
       if (ql) {
         const idx = ql.selectedIndex;
         if (idx >= 0 && ql[idx]?.height) setQuality(`${ql[idx].height}p`);
@@ -462,7 +462,7 @@ export default function HlsPlayer({
       onMouseMove={handleMouseMove}
       onMouseLeave={() => {
         if (playing && !menuOpenRef.current) {
-          clearTimeout(hideTimer.current);
+          clearTimeout(hideTimer.current!);
           hideTimer.current = setTimeout(() => setShowControls(false), 500);
         }
       }}
@@ -705,8 +705,8 @@ export default function HlsPlayer({
                         const p = playerRef.current;
                         if (!p) return;
                         const tt = p.textTracks();
-                        for (let i = 0; i < tt.length; i++) tt[i].mode = "disabled";
-                        for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+    for (let i = 0; i < tt.length; i++) (tt as any)[i].mode = "disabled";
+                        for (const t of externalTrackRefs.current) (t.el as any).mode = "disabled";
                         activeExternal.current = null;
                         setShowCcm(false);
                         updateTracks();
@@ -725,8 +725,8 @@ export default function HlsPlayer({
                           const p = playerRef.current;
                           if (!p) return;
                           const tt = p.textTracks();
-                          for (let j = 0; j < tt.length; j++) tt[j].mode = j === i ? "showing" : "disabled";
-                          for (const t of externalTrackRefs.current) t.el.mode = "disabled";
+                          for (let j = 0; j < tt.length; j++) (tt as any)[j].mode = j === i ? "showing" : "disabled";
+    for (const t of externalTrackRefs.current) (t.el as any).mode = "disabled";
                           activeExternal.current = null;
                           setShowCcm(false);
                           updateTracks();
@@ -791,7 +791,7 @@ export default function HlsPlayer({
                           const p = playerRef.current;
                           if (!p) return;
                           const at = p.audioTracks();
-                          for (let j = 0; j < at.length; j++) at[j].enabled = j === i;
+                          for (let j = 0; j < at.length; j++) (at as any)[j].enabled = j === i;
                           setShowAudioMenu(false);
                           updateTracks();
                         }}

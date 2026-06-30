@@ -2,7 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 
 const BASE = "https://api.themoviedb.org/3";
 
-async function tmdb(path: string, params: Record<string, string | number> = {}) {
+async function tmdb(path: string, params: Record<string, string | number | undefined> = {}) {
   const key = process.env.TMDB_API_KEY;
   if (!key) throw new Error("TMDB_API_KEY is not configured");
   const url = new URL(BASE + path);

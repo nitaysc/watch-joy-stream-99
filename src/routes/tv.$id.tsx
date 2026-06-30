@@ -62,7 +62,7 @@ function TvPage() {
           <MediaDetails
             id={tvId}
             mediaType="tv"
-            poster={m.backdrop}
+            poster={m.backdrop ?? undefined}
             season={String(season)}
             episode={String(episode)}
             title={m.title}

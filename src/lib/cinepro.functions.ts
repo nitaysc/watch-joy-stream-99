@@ -42,7 +42,7 @@ export const getStreams = createServerFn({ method: "GET" })
       : `${CINEPRO_BASE}/v1/movies/${data.id}`;
 
     try {
-      const cache = caches.default as any;
+      const cache = (caches as any).default;
       const cacheKey = new Request(url);
       const cached = await cache.match(cacheKey);
       if (cached) {
@@ -69,7 +69,7 @@ export const getStreams = createServerFn({ method: "GET" })
     }));
 
     try {
-      const cache = caches.default as any;
+      const cache = (caches as any).default;
       const cacheKey = new Request(url);
       const ttl = Math.max(120, Math.floor((new Date(json.expiresAt).getTime() - Date.now()) / 1000));
       const cachedRes = new Response(JSON.stringify(json), {

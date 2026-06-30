@@ -209,8 +209,8 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
           return [...prev, hdSource];
         });
-        setStreamUrl((prev) => prev ? prev : hdSource.url);
-        setStreamType((prev) => prev ? prev : hdSource.type);
+        setStreamUrl((prev) => prev ? prev : hdSource.url ?? null);
+        setStreamType((prev) => prev ? prev : hdSource.type ?? "application/x-mpegURL");
         setActiveIdx((prev) => streamUrl ? prev : 0);
       } catch {
         // HDRezka unavailable — non-blocking
