@@ -1,7 +1,7 @@
 import { HDREZKA_MIRRORS, type HdrezkaStreamFormat } from "./hdrezka.types";
 
 const CINEPRO_BASE = "https://core-production-ef8a.up.railway.app";
-const TIMEOUT = 5000;
+const TIMEOUT = 30000;
 
 /* ------------------------------------------------------------------ */
 /*  Direct fetch helpers                                              */
