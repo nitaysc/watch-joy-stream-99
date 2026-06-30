@@ -70,8 +70,8 @@ export const searchSubtitles = createServerFn({ method: "GET" })
     return json.data.map((item) => ({
       file_id: item.attributes.file_id,
       language: item.attributes.language,
-      language_english_name: item.attributes.language_english_name,
-      hearing_impaired: item.attributes.hearing_impaired,
+      language_english_name: item.attributes.language_english_name || item.attributes.language || "Unknown",
+      hearing_impaired: !!item.attributes.hearing_impaired,
       file_name: item.attributes.file_name,
       fps: item.attributes.fps,
     }));

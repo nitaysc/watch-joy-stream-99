@@ -53,9 +53,16 @@ export const getStreams = createServerFn({ method: "GET" })
 
     let json: CineProResponse | null = null;
 
-    const res = await fetchWithTimeout(url, 8000);
-    if (res.ok) {
-      try { json = await res.json(); } catch {}
+    const first = await fetchWithTimeout(url, 12000);
+    if (first.ok) {
+      try { json = await first.json(); } catch {}
+    }
+
+    if (!json?.sources?.length) {
+      const second = await fetchWithTimeout(url, 16000);
+      if (second.ok) {
+        try { json = await second.json(); } catch {}
+      }
     }
 
     if (!json?.sources?.length) {
