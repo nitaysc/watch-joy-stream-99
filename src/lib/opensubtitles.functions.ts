@@ -89,23 +89,33 @@ export const searchSubtitles = createServerFn({ method: "GET" })
 export const getSubtitleVtt = createServerFn({ method: "GET" })
   .inputValidator((d: { file_id: number }) => d)
   .handler(async ({ data }) => {
-    const dlRes = await fetch("https://api.opensubtitles.com/api/v1/download", {
-      method: "POST",
-      headers: {
-        "Api-Key": API_KEY,
-        "User-Agent": "Cinely v1",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ file_id: data.file_id }),
-    });
+    // Retry up to 3 times with backoff for 5xx errors
+    let lastErr: Error | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (attempt > 0) await new Promise((r) => setTimeout(r, 2000 * attempt));
 
-    if (!dlRes.ok) throw new Error(`Download failed: ${dlRes.status}`);
+      const dlRes = await fetch("https://api.opensubtitles.com/api/v1/download", {
+        method: "POST",
+        headers: {
+          "Api-Key": API_KEY,
+          "User-Agent": "Cinely v1",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ file_id: data.file_id }),
+      });
 
-    const dlJson: { link: string; file_name: string } = await dlRes.json();
+      if (dlRes.ok) {
+        const dlJson: { link: string; file_name: string } = await dlRes.json();
+        const subRes = await fetch(dlJson.link);
+        if (!subRes.ok) throw new Error(`Subtitle fetch failed: ${subRes.status}`);
+        const srt = await subRes.text();
+        return { vtt: srtToVtt(srt), fileName: dlJson.file_name };
+      }
 
-    const subRes = await fetch(dlJson.link);
-    if (!subRes.ok) throw new Error(`Subtitle fetch failed: ${subRes.status}`);
+      // 503 = temporary, retry. Other errors = permanent
+      if (dlRes.status !== 503) break;
+      lastErr = new Error(`OpenSubtitles download returned ${dlRes.status}`);
+    }
 
-    const srt = await subRes.text();
-    return { vtt: srtToVtt(srt), fileName: dlJson.file_name };
+    throw lastErr ?? new Error("OpenSubtitles download failed after retries");
   });

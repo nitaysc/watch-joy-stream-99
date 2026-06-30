@@ -253,7 +253,7 @@ export default function HlsPlayer({
         setExternalVtts((prev) => ({ ...prev, [fileId]: vtt! }));
         setSubError(null);
       } catch {
-        setSubError("Subtitle download failed - provider may be unavailable");
+        setSubError("Subtitle server busy — retrying... try again in a moment");
         setLoadingSub((prev) => { const n = new Set(prev); n.delete(fileId); return n; });
         return;
       }
