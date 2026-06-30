@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import * as cheerio from "cheerio";
 import {
   getBaseUrl,
-  buildHeaders,
   cdnPost,
   proxyFetch,
   decodeStreamUrl,
@@ -20,10 +19,7 @@ import type {
 const reInitCDN = /initCDN(?:Series|Movies)Events\(\d+,\s(\d+),.+?(\{.*?\})\);/;
 
 async function fetchPage(url: string): Promise<string> {
-  const res = await proxyFetch(url, {
-    headers: buildHeaders(),
-    signal: AbortSignal.timeout(15000),
-  });
+  const res = await proxyFetch(url);
   if (!res.ok) throw new Error(`HDRezka page returned ${res.status}`);
   return res.text();
 }

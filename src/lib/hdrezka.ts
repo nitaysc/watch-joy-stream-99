@@ -1,20 +1,19 @@
-import { HDREZKA_MIRRORS, HDREZKA_USER_AGENT, type HdrezkaStreamFormat } from "./hdrezka.types";
+import { HDREZKA_MIRRORS, type HdrezkaStreamFormat } from "./hdrezka.types";
 
 const CINEPRO_BASE = "https://core-production-ef8a.up.railway.app";
+const TIMEOUT = 5000;
 
 /* ------------------------------------------------------------------ */
-/*  Proxy helpers                                                     */
+/*  Railway proxy helpers                                             */
 /* ------------------------------------------------------------------ */
 
 function extractProxyResponse(text: string): string | null {
-  // Response body is: /v1/proxy?data=URL_ENCODED_JSON
   const m = text.match(/\/v1\/proxy\?data=(.+)$/);
   if (!m) return null;
   try {
     const decoded = decodeURIComponent(m[1]);
     const obj = JSON.parse(decoded);
     const raw = obj.url as string;
-    // The url field has format: https://<actual_content>
     const sepIdx = raw.indexOf("//");
     return sepIdx !== -1 ? raw.slice(sepIdx + 2) : raw;
   } catch {
@@ -22,189 +21,67 @@ function extractProxyResponse(text: string): string | null {
   }
 }
 
-async function tryRailwayProxy(
-  url: string,
-  options?: RequestInit & { form?: Record<string, string> },
-): Promise<Response | null> {
-  // GET with bare URL
+async function railFetch(url: string): Promise<Response | null> {
   try {
     const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url }))}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-    if (res.ok) {
-      const text = await res.text();
-      const content = extractProxyResponse(text);
-      if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
-    }
-  } catch {}
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(TIMEOUT) });
+    if (!res.ok) return null;
+    const text = await res.text();
+    const content = extractProxyResponse(text);
+    if (!content) return null;
+    return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
+  } catch {
+    return null;
+  }
+}
 
-  // POST with bare URL
+async function railPost(url: string, form: Record<string, string>): Promise<Response | null> {
+  // GET-style with form as query params
+  const fullUrl = `${url}&${new URLSearchParams(form).toString()}`;
+  const r1 = await railFetch(fullUrl);
+  if (r1) return r1;
+  // POST with body
   try {
     const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ url }),
-      signal: AbortSignal.timeout(15000),
+      body: JSON.stringify({ url, method: "POST", body: new URLSearchParams(form).toString() }),
+      signal: AbortSignal.timeout(TIMEOUT),
     });
-    if (res.ok) {
-      const text = await res.text();
-      const content = extractProxyResponse(text);
-      if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
-    }
-  } catch {}
-
-  // GET with form data appended to URL (for CDN POST fallback)
-  if (options?.form) {
-    try {
-      const fullUrl = `${url}&${new URLSearchParams(options.form).toString()}`;
-      const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify({ url: fullUrl }))}`;
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
-      if (res.ok) {
-        const text = await res.text();
-        const content = extractProxyResponse(text);
-        if (content) return new Response(content, { status: 200, headers: { "content-type": "text/html" } });
-      }
-    } catch {}
+    if (!res.ok) return null;
+    const text = await res.text();
+    const content = extractProxyResponse(text);
+    if (!content) return null;
+    return new Response(content, { status: 200, headers: { "content-type": "application/json" } });
+  } catch {
+    return null;
   }
-
-  return null;
-}
-
-async function tryAllorigins(url: string): Promise<Response | null> {
-  try {
-    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.contents) {
-        return new Response(json.contents, {
-          status: 200,
-          headers: { "content-type": res.headers.get("content-type") ?? "text/html" },
-        });
-      }
-    }
-  } catch {}
-  return null;
-}
-
-async function tryCodetabs(url: string): Promise<Response | null> {
-  try {
-    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) return res;
-  } catch {}
-  return null;
-}
-
-async function tryDirect(url: string, options?: RequestInit): Promise<Response | null> {
-  try {
-    const res = await fetch(url, { ...options, signal: AbortSignal.timeout(8000) });
-    if (res.ok) return res;
-  } catch {}
-  return null;
 }
 
 /* ------------------------------------------------------------------ */
 /*  Exported fetch helpers                                            */
 /* ------------------------------------------------------------------ */
 
-const proxyChain = [
-  tryRailwayProxy,
-  tryAllorigins,
-  tryCodetabs,
-  tryDirect,
-];
-
-export async function proxyFetch(
-  url: string,
-  options?: RequestInit,
-): Promise<Response> {
-  if (!options?.method || options.method === "GET") {
-    for (const proxy of proxyChain) {
-      const res = await proxy(url, options);
-      if (res) return res;
-    }
-  }
-
-  // Final direct fallback (will throw on failure)
-  return fetch(url, { ...options, signal: AbortSignal.timeout(8000) });
+export async function proxyFetch(url: string, _options?: RequestInit): Promise<Response> {
+  const res = await railFetch(url);
+  if (res) return res;
+  throw new Error(`Railway proxy returned no response for ${url}`);
 }
 
-export async function proxyPost(
-  url: string,
-  form: Record<string, string>,
-): Promise<Response> {
-  // 1) Try Railway proxy — pass form data as query params (GET-style)
-  const railRes = await tryRailwayProxy(url, { form });
-  if (railRes) return railRes;
-
-  // 2) Try Railway proxy with POST body in the proxy request
-  try {
-    const body = JSON.stringify({ url, method: "POST", body: new URLSearchParams(form).toString() });
-    const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-      signal: AbortSignal.timeout(15000),
-    });
-    if (res.ok) {
-      const text = await res.text();
-      const content = extractProxyResponse(text);
-      if (content) return new Response(content, { status: 200, headers: { "content-type": "application/json" } });
-    }
-  } catch {}
-
-  // 3) Try allorigins with form data appended as query params
-  const aoRes = await tryAllorigins(`${url}&${new URLSearchParams(form).toString()}`);
-  if (aoRes) return aoRes;
-
-  // 4) Try direct POST (will likely fail from CF Workers)
-  const directRes = await tryDirect(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": HDREZKA_USER_AGENT,
-    },
-    body: new URLSearchParams(form).toString(),
-  });
-  if (directRes) return directRes;
-
-  throw new Error("All HDRezka POST attempts failed");
+export async function proxyPost(url: string, form: Record<string, string>): Promise<Response> {
+  const res = await railPost(url, form);
+  if (res) return res;
+  throw new Error(`Railway proxy POST failed for ${url}`);
 }
 
 /* ------------------------------------------------------------------ */
 /*  Original module exports                                           */
 /* ------------------------------------------------------------------ */
 
-let activeMirror: string | null = null;
-
-async function probeMirror(mirror: string): Promise<boolean> {
-  try {
-    const res = await proxyFetch(mirror);
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
+let activeMirror: string | null = HDREZKA_MIRRORS[0];
 
 export async function getBaseUrl(): Promise<string> {
-  if (activeMirror) return activeMirror;
-  for (const m of HDREZKA_MIRRORS) {
-    if (await probeMirror(m)) {
-      activeMirror = m;
-      return m;
-    }
-  }
-  activeMirror = HDREZKA_MIRRORS[0];
-  return activeMirror;
-}
-
-export function buildHeaders(): Record<string, string> {
-  return {
-    "User-Agent": HDREZKA_USER_AGENT,
-    Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    Referer: (activeMirror ?? HDREZKA_MIRRORS[0]) + "/",
-  };
+  return activeMirror!;
 }
 
 export async function cdnPost(
