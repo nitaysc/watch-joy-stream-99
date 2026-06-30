@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { getAnimeInfo, getEpisodeSources, type AnimeInfo, type EpisodeSources } from "@/lib/consumet.functions";
 import HlsPlayer, { type ServerSource } from "@/components/HlsPlayer";
+import EmbedOverlay from "@/components/EmbedOverlay";
 import { Play, ChevronDown, Star, Calendar, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/anime/$id")({
@@ -27,6 +28,12 @@ function AnimePage() {
   const [epSources, setEpSources] = useState<ServerSource[]>([]);
   const [activeEpSourceIdx, setActiveEpSourceIdx] = useState(0);
   const [epLoading, setEpLoading] = useState(false);
+  const [embedOpen, setEmbedOpen] = useState<null | { src: string; title: string }>(null);
+
+  // AnimeSaturn watch URL — opens the AnimeSaturn site directly (search by title).
+  const animeSaturnUrl = anime
+    ? `https://www.animesaturn.cx/animelist?search=${encodeURIComponent(anime.title)}`
+    : "";
 
   useEffect(() => {
     setLoading(true);
@@ -135,6 +142,20 @@ function AnimePage() {
             </div>
           )}
         </div>
+
+        {/* AnimeSaturn server fallback */}
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => setEmbedOpen({ src: animeSaturnUrl, title: `AnimeSaturn — ${anime.title}` })}
+            className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-4 py-2 text-xs font-medium text-purple-300 ring-1 ring-purple-500/20 transition-all hover:bg-purple-500/20 hover:ring-purple-500/40"
+          >
+            🌸 AnimeSaturn Server
+          </button>
+        </div>
+
+        {embedOpen && (
+          <EmbedOverlay src={embedOpen.src} title={embedOpen.title} onClose={() => setEmbedOpen(null)} />
+        )}
 
         {/* Info */}
         <div className="mt-8 grid gap-8 md:grid-cols-[220px_1fr]">
