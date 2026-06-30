@@ -29,12 +29,13 @@ export const searchHDRezka = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<HdrezkaSearchItem[]> => {
     try {
       const baseUrl = await getBaseUrl();
-      const searchUrl = `${baseUrl}/engine/ajax/search.php?q=${encodeURIComponent(data.query)}`;
+      const searchUrl = `${baseUrl}/search/?do=search&subaction=search&q=${encodeURIComponent(data.query)}`;
       const html = await fetchPage(searchUrl);
       const items: HdrezkaSearchItem[] = [];
-      const liRegex = /<li><a href="([^"]+)">(.*?)<\/a><\/li>/g;
+      
+      const itemRegex = /<div class="b-content__inline_item-link">[\s\S]*?<a href="([^"]+)">(.*?)<\/a>/g;
       let m;
-      while ((m = liRegex.exec(html)) !== null) {
+      while ((m = itemRegex.exec(html)) !== null) {
         const url = m[1];
         const inner = m[2];
         const titleMatch = inner.match(/<span class="enty">([^<]+)<\/span>/);
