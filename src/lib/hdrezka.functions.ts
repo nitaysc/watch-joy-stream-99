@@ -31,7 +31,8 @@ async function fetchPage(url: string): Promise<string> {
 export const searchHDRezka = createServerFn({ method: "GET" })
   .inputValidator((d: { query: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaSearchItem[]> => {
-    const baseUrl = await getBaseUrl();
+    let baseUrl: string;
+    try { baseUrl = await getBaseUrl(); } catch { return []; }
     const searchUrl = `${baseUrl}/engine/ajax/search.php?q=${encodeURIComponent(data.query)}`;
 
     let html: string;
@@ -61,7 +62,8 @@ export const searchHDRezka = createServerFn({ method: "GET" })
 export const getHDRezkaVideo = createServerFn({ method: "GET" })
   .inputValidator((d: { url: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaVideo | null> => {
-    const baseUrl = await getBaseUrl();
+    let baseUrl: string;
+    try { baseUrl = await getBaseUrl(); } catch { return null; }
     const url = data.url.startsWith("http") ? data.url : `${baseUrl}${data.url}`;
 
     let html: string;
@@ -222,7 +224,8 @@ export const getHDRezkaStream = createServerFn({ method: "GET" })
     }) => d,
   )
   .handler(async ({ data }): Promise<HdrezkaStream | null> => {
-    const baseUrl = await getBaseUrl();
+    let baseUrl: string;
+    try { baseUrl = await getBaseUrl(); } catch { return null; }
 
     const form: Record<string, string> = {
       id: data.videoId,

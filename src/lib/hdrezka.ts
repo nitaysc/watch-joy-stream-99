@@ -15,16 +15,31 @@ async function tryRailwayProxy(
     if (options?.headers) data.headers = options.headers;
     if (options?.form) data.form = options.form;
     const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify(data))}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) });
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
     if (res.ok) return res;
   } catch {}
+
+  try {
+    const body: Record<string, any> = { url };
+    if (options?.headers) body.headers = options.headers;
+    if (options?.form) body.form = options.form;
+    if (options?.method === "POST") body.method = "POST";
+    const res = await fetch(`${CINEPRO_BASE}/v1/proxy`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (res.ok) return res;
+  } catch {}
+
   return null;
 }
 
 async function tryAllorigins(url: string): Promise<Response | null> {
   try {
     const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
     if (res.ok) {
       const json = await res.json();
       if (json.contents) {
@@ -38,64 +53,79 @@ async function tryAllorigins(url: string): Promise<Response | null> {
   return null;
 }
 
+async function tryCodetabs(url: string): Promise<Response | null> {
+  try {
+    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) return res;
+  } catch {}
+  return null;
+}
+
+async function tryDirect(url: string, options?: RequestInit): Promise<Response | null> {
+  try {
+    const res = await fetch(url, { ...options, signal: AbortSignal.timeout(8000) });
+    if (res.ok) return res;
+  } catch {}
+  return null;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Exported fetch helpers                                            */
 /* ------------------------------------------------------------------ */
+
+const proxyChain = [
+  tryRailwayProxy,
+  tryAllorigins,
+  tryCodetabs,
+  tryDirect,
+];
 
 export async function proxyFetch(
   url: string,
   options?: RequestInit,
 ): Promise<Response> {
-  // 1. Railway proxy (accessible from CF Workers)
   if (!options?.method || options.method === "GET") {
-    const railRes = await tryRailwayProxy(url, options);
-    if (railRes) return railRes;
-
-    // 2. allorigins CORS proxy
-    const aoRes = await tryAllorigins(url);
-    if (aoRes) return aoRes;
+    for (const proxy of proxyChain) {
+      const res = await proxy(url, options);
+      if (res) return res;
+    }
   }
 
-  // Direct fallback
-  return fetch(url, { ...options, signal: AbortSignal.timeout(10000) });
+  // Final direct fallback (will throw on failure)
+  return fetch(url, { ...options, signal: AbortSignal.timeout(8000) });
 }
 
 export async function proxyPost(
   url: string,
   form: Record<string, string>,
 ): Promise<Response> {
-  // 1. Railway proxy with encoded form data as URL params
-  const data: Record<string, any> = { url, method: "POST" };
-  data.form = form;
-  try {
-    const proxyUrl = `${CINEPRO_BASE}/v1/proxy?data=${encodeURIComponent(JSON.stringify(data))}`;
-    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(20000) });
-    if (res.ok) return res;
-  } catch {}
+  const railRes = await tryRailwayProxy(url, { ...({ form } as any), method: "POST" });
+  if (railRes) return railRes;
 
-  // 2. allorigins with body as query params
   const aoRes = await tryAllorigins(`${url}&${new URLSearchParams(form).toString()}`);
   if (aoRes) {
-    return new Response(
-      await aoRes.text(),
-      { status: 200, headers: { "content-type": "application/json" } },
-    );
+    return new Response(await aoRes.text(), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
   }
 
-  // 3. Direct POST fallback
-  return fetch(url, {
+  const directRes = await tryDirect(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
       "User-Agent": HDREZKA_USER_AGENT,
     },
     body: new URLSearchParams(form).toString(),
-    signal: AbortSignal.timeout(10000),
   });
+  if (directRes) return directRes;
+
+  throw new Error("All HDRezka POST attempts failed");
 }
 
 /* ------------------------------------------------------------------ */
-/*  Original module exports (signatures unchanged)                    */
+/*  Original module exports                                           */
 /* ------------------------------------------------------------------ */
 
 let activeMirror: string | null = null;
@@ -117,7 +147,8 @@ export async function getBaseUrl(): Promise<string> {
       return m;
     }
   }
-  throw new Error("No working HDRezka mirror found");
+  activeMirror = HDREZKA_MIRRORS[0];
+  return activeMirror;
 }
 
 export function buildHeaders(): Record<string, string> {
