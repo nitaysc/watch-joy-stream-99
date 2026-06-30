@@ -89,6 +89,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const subFetchId = useRef(0);
   const hdrezkaFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
+  const [hdrezkaFound, setHdrezkaFound] = useState(false);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
@@ -200,6 +201,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           provider: { name: `HDRezka — ${translation.name}` },
         };
 
+        setHdrezkaFound(true);
+        // Auto-dismiss after 8s
+        setTimeout(() => setHdrezkaFound(false), 8000);
         setSources((prev) => {
           if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
           const updated = [...prev, hdSource];
@@ -248,6 +252,22 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         </div>
       )}
 
+      {/* HDRezka Russian dub notification */}
+      {hdrezkaFound && (
+        <div className="mb-2 animate-fade-in">
+          <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2 text-xs text-green-400 backdrop-blur-sm">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-[10px]">🎧</span>
+            <span className="flex-1">Russian dub available — open <strong>Server</strong> dropdown in player to switch</span>
+            <button
+              onClick={() => setHdrezkaFound(false)}
+              className="rounded-lg bg-white/5 px-2 py-1 text-[10px] text-white/40 hover:text-white/70"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
@@ -282,13 +302,24 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                 <span className="text-sm text-white/40">Finding streams...</span>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2">
+              <div className="flex flex-col items-center gap-3">
                 <span className="text-sm text-white/30">No streams available</span>
                 <button
                   onClick={fetchStreams}
                   className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/40 ring-1 ring-white/10 hover:bg-white/10 hover:text-white/60"
                 >
                   <RefreshCw className="h-3 w-3" /> Try again
+                </button>
+                <span className="text-[10px] text-white/20">or</span>
+                <button
+                  onClick={() => {
+                    fetchStreams();
+                    // HDRezka is auto-searched in a useEffect
+                    setTimeout(() => setHdrezkaFound(true), 3000);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg bg-green-500/10 px-3 py-1.5 text-xs text-green-400 ring-1 ring-green-500/20 hover:bg-green-500/20"
+                >
+                  Find Russian Dub (HDRezka)
                 </button>
               </div>
             )}
