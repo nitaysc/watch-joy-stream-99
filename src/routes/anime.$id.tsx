@@ -28,6 +28,12 @@ function AnimePage() {
   const [epSources, setEpSources] = useState<ServerSource[]>([]);
   const [activeEpSourceIdx, setActiveEpSourceIdx] = useState(0);
   const [epLoading, setEpLoading] = useState(false);
+  const [embedOpen, setEmbedOpen] = useState<null | { src: string; title: string }>(null);
+
+  // AnimeSaturn watch URL — opens the AnimeSaturn site directly (search by title).
+  const animeSaturnUrl = anime
+    ? `https://www.animesaturn.cx/animelist?search=${encodeURIComponent(anime.title)}`
+    : "";
 
   useEffect(() => {
     setLoading(true);
