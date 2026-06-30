@@ -49,7 +49,7 @@ export const searchSubtitles = createServerFn({ method: "GET" })
   .handler(async ({ data }) => {
     const params = new URLSearchParams();
     params.set("tmdb_id", String(data.tmdbId));
-    params.set("languages", data.language ?? "en");
+    params.set("languages", "en,fr,es,de,pt,ar,ja,ko,zh,it,nl,pl,ru,sv,da,fi,nb,tr");
     params.set("type", data.season ? "episode" : "movie");
     if (data.season) params.set("season_number", String(data.season));
     if (data.episode) params.set("episode_number", String(data.episode));

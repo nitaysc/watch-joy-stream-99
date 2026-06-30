@@ -84,6 +84,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const [sources, setSources] = useState<ServerSource[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const fetchId = useRef(0);
+  const subFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
 
   const applySources = (sorted: Source[]) => {
@@ -123,27 +124,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     setStreamUrl(null);
 
     getStreams({ data: { id, mediaType, season, episode } })
-      .then(async (data) => {
+      .then((data) => {
         if (currentId !== fetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
         const sorted = [...data.sources].sort(sortSources);
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
-        // Fetch available subtitles from OpenSubtitles
-        try {
-          const subs = await searchSubtitles({ data: {
-            tmdbId: Number(id),
-            season: season ? Number(season) : undefined,
-            episode: episode ? Number(episode) : undefined,
-          }});
-          if (currentId === fetchId.current) {
-            setSubtitles(subs.map((s) => ({
-              file_id: s.file_id,
-              language: s.language,
-              label: s.language_english_name + (s.hearing_impaired ? " [HI]" : ""),
-            })));
-          }
-        } catch {}
       })
       .catch((err) => {
         if (currentId !== fetchId.current) return;
@@ -155,6 +141,25 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   };
 
   useEffect(fetchStreams, [id, mediaType, season, episode]);
+
+  // Fetch subtitles independently from streams
+  useEffect(() => {
+    const fetchSubId = ++subFetchId.current;
+    const tmdbId = Number(id);
+    if (!tmdbId) return;
+    searchSubtitles({ data: {
+      tmdbId,
+      season: season ? Number(season) : undefined,
+      episode: episode ? Number(episode) : undefined,
+    }}).then((subs) => {
+      if (fetchSubId !== subFetchId.current) return;
+      setSubtitles(subs.map((s) => ({
+        file_id: s.file_id,
+        language: s.language,
+        label: s.language_english_name + (s.hearing_impaired ? " [HI]" : ""),
+      })));
+    }).catch(() => {});
+  }, [id, mediaType, season, episode]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
