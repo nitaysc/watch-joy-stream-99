@@ -50,8 +50,8 @@ export interface HdrezkaSource {
 }
 
 export const HDREZKA_MIRRORS = [
+  "https://hdrezka-home.tv",
   "https://hdrezka.ag",
-  "https://rezka.ag",
   "https://hdrzk.org",
   "https://hdrezka.cm",
   "https://hdrezka.art",
