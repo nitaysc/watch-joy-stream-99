@@ -164,57 +164,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
 
-  // Fetch HDRezka sources for Russian dubs
-  useEffect(() => {
-    const currentId = ++hdrezkaFetchId.current;
-    const searchQuery = title || String(id);
-    if (!searchQuery) return;
+  // Build Russian dub embed URL (vidsrc.cc provides multi-language audio incl. Russian)
+  const russianEmbedUrl =
+    mediaType === "tv"
+      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
+      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
 
-    (async () => {
-      try {
-        const results = await searchHDRezka({ data: { query: searchQuery } });
-        if (currentId !== hdrezkaFetchId.current || results.length === 0) return;
-
-        const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-        if (currentId !== hdrezkaFetchId.current || !video || video.translations.length === 0) return;
-
-        // Resolve first default/russian translation
-        const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-        const stream = await resolveStreamUrl({
-          data: {
-            videoId: video.id,
-            translatorId: translation.id,
-            season: season ? Number(season) : undefined,
-            episode: episode ? Number(episode) : undefined,
-          },
-        });
-        if (currentId !== hdrezkaFetchId.current || !stream) return;
-
-        const hlsUrl = stream.hls || stream.mp4;
-        if (!hlsUrl) return;
-
-        const hdSource: ServerSource = {
-          url: hlsUrl,
-          type: stream.hls ? "application/x-mpegURL" : "video/mp4",
-          quality: "1080p",
-          provider: { name: `HDRezka — ${translation.name}` },
-        };
-
-        setHdrezkaFound(true);
-        // Auto-dismiss after 8s
-        setTimeout(() => setHdrezkaFound(false), 8000);
-        setSources((prev) => {
-          if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
-          return [...prev, hdSource];
-        });
-        setStreamUrl((prev) => prev ? prev : hdSource.url);
-        setStreamType((prev) => prev ? prev : hdSource.type);
-        setActiveIdx((prev) => streamUrl ? prev : 0);
-      } catch {
-        // HDRezka unavailable — non-blocking
-      }
-    })();
-  }, [id, mediaType, season, episode, title, hdrezkaRetry]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
