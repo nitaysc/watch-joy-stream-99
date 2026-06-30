@@ -181,21 +181,34 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       for (const q of queries) {
         if (currentId !== hdrezkaFetchId.current) return;
         try {
+          console.log("HDRezka: Searching for", q);
           const results = await searchHDRezka({ data: { query: q } });
+          console.log("HDRezka: Search results:", results);
           if (currentId !== hdrezkaFetchId.current) return;
           if (results.length === 0) continue;
 
+          console.log("HDRezka: Fetching video for", results[0].url);
           const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-          if (currentId !== hdrezkaFetchId.current || !video) return;
-          if (video.translations.length === 0) continue;
+          console.log("HDRezka: Video result:", video);
+          if (currentId !== hdrezkaFetchId.current) return;
+          if (!video) {
+            console.error("HDRezka: getHDRezkaVideo returned null!");
+            return;
+          }
+          if (video.translations.length === 0) {
+            console.error("HDRezka: Video has no translations!");
+            continue;
+          }
 
           const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
+          console.log("HDRezka: Selected translation:", translation);
 
           // First try: use the stream data already embedded in the page HTML (always works)
           let hlsUrl = "";
           let streamType = "application/x-mpegURL";
 
           if (video.defaultStream) {
+            console.log("HDRezka: Using defaultStream formats:", Object.keys(video.defaultStream.formats));
             const bestKey = Object.keys(video.defaultStream.formats).find(k => k === "1080p")
               || Object.keys(video.defaultStream.formats).find(k => k === "720p")
               || Object.keys(video.defaultStream.formats).find(k => k === "480p")
@@ -209,6 +222,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
 
           // Fallback: try the POST endpoint (requires cookies)
           if (!hlsUrl) {
+            console.log("HDRezka: No defaultStream HLS, calling resolveStreamUrl...");
             const stream = await resolveStreamUrl({
               data: {
                 videoId: video.id,
@@ -217,12 +231,16 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                 episode: episode ? Number(episode) : undefined,
               },
             });
+            console.log("HDRezka: resolveStreamUrl result:", stream);
             if (currentId !== hdrezkaFetchId.current || !stream) return;
             hlsUrl = stream.hls || stream.mp4;
             if (!stream.hls && stream.mp4) streamType = "video/mp4";
           }
 
-          if (!hlsUrl) return;
+          if (!hlsUrl) {
+            console.error("HDRezka: NO HLS URL EXTRACTED!");
+            return;
+          }
 
           const hdSource: ServerSource = {
             url: hlsUrl,
@@ -231,6 +249,8 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
             provider: { name: `HDRezka — ${translation.name}` },
           };
 
+          console.log("HDRezka: SUCCESS!", hdSource);
+          
           setHdrezkaFound(true);
           setTimeout(() => setHdrezkaFound(false), 15000);
           
@@ -243,7 +263,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           });
           return;
         } catch (e) {
-          console.error("HDRezka search failed for:", q, e);
+          console.error("HDRezka Server-Side fetch failed:", e);
         }
       }
     } finally {
