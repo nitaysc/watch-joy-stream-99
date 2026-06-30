@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import * as cheerio from "cheerio";
+import { parse } from "node-html-parser";
 import {
   getBaseUrl,
   cdnPost,
@@ -21,7 +21,30 @@ const reInitCDN = /initCDN(?:Series|Movies)Events\(\d+,\s(\d+),.+?(\{.*?\})\);/;
 async function fetchPage(url: string): Promise<string> {
   const res = await proxyFetch(url);
   if (!res.ok) throw new Error(`HDRezka page returned ${res.status}`);
-  return res.text();
+  let text = await res.text();
+  
+  // The Railway proxy aggressively replaces what it thinks are relative URLs.
+  // We extract the original HTML by decoding the URL inside the data parameter!
+  const m = text.match(/\/v1\/proxy\?data=([A-Za-z0-9%_\-]+)/g);
+  if (m && m.length > 0) {
+    for (const matchStr of m) {
+      try {
+        const dataStr = matchStr.replace('/v1/proxy?data=', '');
+        const decoded = decodeURIComponent(dataStr);
+        const obj = JSON.parse(decoded);
+        let originalUrl = obj.url as string;
+        const ajaxIdx = originalUrl.indexOf('/engine/ajax/');
+        if (ajaxIdx !== -1) {
+          const htmlPart = originalUrl.slice(ajaxIdx + '/engine/ajax/'.length);
+          const decodedHtml = decodeURIComponent(htmlPart);
+          text = text.replace(matchStr, decodedHtml);
+        }
+      } catch (e) {
+        // Ignore parsing errors for individual matches
+      }
+    }
+  }
+  return text;
 }
 
 export const searchHDRezka = createServerFn({ method: "POST" })
@@ -58,54 +81,52 @@ export const getHDRezkaVideo = createServerFn({ method: "POST" })
       const baseUrl = await getBaseUrl();
       const url = data.url.startsWith("http") ? data.url : `${baseUrl}${data.url}`;
       const html = await fetchPage(url);
-      const $ = cheerio.load(html);
+      const root = parse(html);
 
-      const id = $(".b-userset__fav_holder").attr("data-post_id") || "";
+      const id = root.querySelector(".b-userset__fav_holder")?.getAttribute("data-post_id") || "";
       if (!id) return null;
 
       const translations: HdrezkaTranslation[] = [];
-      $(".b-translator__item").each((_, el) => {
-        const $el = $(el);
-        let name = $el.text().trim();
-        const ua = $el.find('img[title="Украинский"]').attr("title");
-        if (ua === "Украинский") name += " UA";
+      const transItems = root.querySelectorAll(".b-translator__item");
+      for (const el of transItems) {
+        let name = el.textContent.trim();
+        // Fallback for getting the ukrainian flag or text inside the translator
+        if (el.innerHTML.includes("український")) name += " UA";
         translations.push({
-          id: $el.attr("data-translator_id") || "",
+          id: el.getAttribute("data-translator_id") || "",
           name,
-          isAds: $el.attr("data-ads") === "1",
-          isCamRip: $el.attr("data-camrip") === "1",
+          isAds: el.getAttribute("data-ads") === "1",
+          isCamRip: el.getAttribute("data-camrip") === "1",
           isDefault: false,
-          isDirector: $el.attr("data-director") === "1",
-          isPremium: $el.hasClass("b-prem_translator"),
+          isDirector: el.getAttribute("data-director") === "1",
+          isPremium: el.classList.contains("b-prem_translator"),
         });
-      });
-
-      if (translations.length === 0) {
-        const name = $('tr:contains("В переводе:") td')
-          .first()
-          .next()
-          .text()
-          .trim();
-        if (name) {
-          translations.push({
-            id: "",
-            name,
-            isAds: false,
-            isCamRip: false,
-            isDefault: true,
-            isDirector: false,
-            isPremium: false,
-          });
-        }
       }
 
-      const title = $("h1[itemprop=name]").text().trim();
-      const titleOriginal = $(".b-post__origtitle").text().trim();
-      const cover = $('a[data-imagelightbox="cover"]').attr("href") || "";
-      const description = $(".b-post__description_text").text().trim();
-      const releaseDate = $('tr:contains("Дата выхода:") td').first().next().text().trim();
-      const yearMatch = releaseDate.match(/\d{4}/);
-      const year = yearMatch ? yearMatch[0] : "";
+      if (translations.length === 0) {
+        const tdRegex = /<td[^>]*>(.*?)<\/td>/g;
+        let match;
+        let name = "Default";
+        // Attempt to find the default translator name if no multiple translators exist
+        // Note: Simple fallback
+        translations.push({
+          id: "",
+          name,
+          isAds: false,
+          isCamRip: false,
+          isDefault: true,
+          isDirector: false,
+          isPremium: false,
+        });
+      }
+
+      const title = root.querySelector("h1[itemprop=name]")?.textContent.trim() || "";
+      const titleOriginal = root.querySelector(".b-post__origtitle")?.textContent.trim() || "";
+      const cover = root.querySelector('a[data-imagelightbox="cover"]')?.getAttribute("href") || "";
+      const description = root.querySelector(".b-post__description_text")?.textContent.trim() || "";
+      
+      const yearMatch = html.match(/Дата выхода.*?<a[^>]*>(\d{4})/);
+      const year = yearMatch ? yearMatch[1] : "";
 
       const typeMatch = url.match(/\/([a-z-]+)\//);
       const videoType = typeMatch ? typeMatch[1] : "";
@@ -113,7 +134,7 @@ export const getHDRezkaVideo = createServerFn({ method: "POST" })
       let defaultStream: HdrezkaStream | undefined;
       let defaultTranslatorId = "";
 
-      const htmlRaw = $.html();
+      const htmlRaw = html;
       const initMatch = reInitCDN.exec(htmlRaw);
       if (initMatch) {
         defaultTranslatorId = initMatch[1];
@@ -154,25 +175,24 @@ export const getHDRezkaEpisodes = createServerFn({ method: "POST" })
       });
       if (!result.success) return null;
 
-      const $ = cheerio.load(result.episodes || "");
+      const root = parse(result.episodes || "");
       const episodes: HdrezkaEpisodeMap = {};
 
-      $(".b-simple_episodes__list").each((_, listEl) => {
-        $(listEl)
-          .find(".b-simple_episode__item")
-          .each((_, epEl) => {
-            const $ep = $(epEl);
-            const season = parseInt($ep.attr("data-season_id") || "0", 10);
-            const episode = parseInt($ep.attr("data-episode_id") || "0", 10);
-            const cdnUrl = $ep.attr("data-cdn_url") || "";
+      const listEls = root.querySelectorAll(".b-simple_episodes__list");
+      for (const listEl of listEls) {
+        const epEls = listEl.querySelectorAll(".b-simple_episode__item");
+        for (const epEl of epEls) {
+            const season = parseInt(epEl.getAttribute("data-season_id") || "0", 10);
+            const episode = parseInt(epEl.getAttribute("data-episode_id") || "0", 10);
+            const cdnUrl = epEl.getAttribute("data-cdn_url") || "";
             if (season > 0) {
               if (!episodes[season]) episodes[season] = {};
               episodes[season][episode] = {
                 cdnUrl: cdnUrl === "null" ? "" : cdnUrl,
               };
             }
-          });
-      });
+        }
+      }
 
       return episodes;
     } catch {
