@@ -173,61 +173,65 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     const currentId = ++hdrezkaFetchId.current;
     const queries = [title];
 
-    for (const q of queries) {
-      if (currentId !== hdrezkaFetchId.current) return;
-      try {
-        const results = await searchHDRezka({ data: { query: q } });
+    try {
+      for (const q of queries) {
         if (currentId !== hdrezkaFetchId.current) return;
-        if (results.length === 0) continue;
+        try {
+          const results = await searchHDRezka({ data: { query: q } });
+          if (currentId !== hdrezkaFetchId.current) return;
+          if (results.length === 0) continue;
 
-        const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-        if (currentId !== hdrezkaFetchId.current || !video) return;
-        if (video.translations.length === 0) continue;
+          const video = await getHDRezkaVideo({ data: { url: results[0].url } });
+          if (currentId !== hdrezkaFetchId.current || !video) return;
+          if (video.translations.length === 0) continue;
 
-        const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-        const stream = await resolveStreamUrl({
-          data: {
-            videoId: video.id,
-            translatorId: translation.id,
-            season: season ? Number(season) : undefined,
-            episode: episode ? Number(episode) : undefined,
-          },
-        });
-        if (currentId !== hdrezkaFetchId.current || !stream) return;
+          const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
+          const stream = await resolveStreamUrl({
+            data: {
+              videoId: video.id,
+              translatorId: translation.id,
+              season: season ? Number(season) : undefined,
+              episode: episode ? Number(episode) : undefined,
+            },
+          });
+          if (currentId !== hdrezkaFetchId.current || !stream) return;
 
-        const hlsUrl = stream.hls || stream.mp4;
-        if (!hlsUrl) return;
+          const hlsUrl = stream.hls || stream.mp4;
+          if (!hlsUrl) return;
 
-        const hdSource: ServerSource = {
-          url: hlsUrl,
-          type: stream.hls ? "application/x-mpegURL" : "video/mp4",
-          quality: "1080p",
-          provider: { name: `HDRezka — ${translation.name}` },
-        };
+          const hdSource: ServerSource = {
+            url: hlsUrl,
+            type: stream.hls ? "application/x-mpegURL" : "video/mp4",
+            quality: "1080p",
+            provider: { name: `HDRezka — ${translation.name}` },
+          };
 
-        setHdrezkaFound(true);
+          setHdrezkaFound(true);
+          setTimeout(() => setHdrezkaFound(false), 15000);
+          
+          setSources((prev) => {
+            const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
+            if (existsIdx !== -1) {
+              setActiveIdx(existsIdx);
+              return prev;
+            }
+            const newSources = [...prev, hdSource];
+            setActiveIdx(newSources.length - 1);
+            return newSources;
+          });
+          
+          setStreamUrl(hdSource.url ?? null);
+          setStreamType(hdSource.type ?? "application/x-mpegURL");
+          return;
+        } catch (e) {
+          console.error("HDRezka search failed for:", q, e);
+        }
+      }
+    } finally {
+      if (currentId === hdrezkaFetchId.current) {
         setHdrezkaLoading(false);
-        setTimeout(() => setHdrezkaFound(false), 15000);
-        
-        setSources((prev) => {
-          const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
-          if (existsIdx !== -1) {
-            setActiveIdx(existsIdx);
-            return prev;
-          }
-          const newSources = [...prev, hdSource];
-          setActiveIdx(newSources.length - 1);
-          return newSources;
-        });
-        
-        setStreamUrl(hdSource.url ?? null);
-        setStreamType(hdSource.type ?? "application/x-mpegURL");
-        return;
-      } catch (e) {
-        console.error("HDRezka search failed for:", q, e);
       }
     }
-    setHdrezkaLoading(false);
   }, [title, season, episode, streamUrl]);
 
   useEffect(() => {
