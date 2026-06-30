@@ -319,23 +319,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
-      {/* Russian dub source selector */}
-      {streamUrl && (
-        <div className="mt-3 text-center">
-          {hdrezkaLoading ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/5 px-4 py-2 text-xs text-green-400/50">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching Russian dub...
-            </span>
-          ) : (
-            <button
-              onClick={doHdrezkaSearch}
-              className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
-            >
-              <Languages className="h-3.5 w-3.5" /> Russian Dub
-            </button>
-          )}
-        </div>
-      )}
     </div>
   );
 }

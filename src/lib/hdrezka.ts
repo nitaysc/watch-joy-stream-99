@@ -11,11 +11,14 @@ const HEADERS = {
   "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
 };
 
+const PROXY_URL = "https://hdrezka-proxy.onrender.com/proxy";
+
 export async function proxyFetch(url: string, _options?: RequestInit): Promise<Response> {
+  const proxyTarget = url.replace(/^https?:\/\/[^\/]+/, PROXY_URL);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   try {
-    const res = await fetch(url, { headers: HEADERS, signal: controller.signal });
+    const res = await fetch(proxyTarget, { headers: HEADERS, signal: controller.signal });
     clearTimeout(timeout);
     if (res.ok) return res;
     throw new Error(`Direct fetch returned ${res.status} for ${url}`);
@@ -26,10 +29,11 @@ export async function proxyFetch(url: string, _options?: RequestInit): Promise<R
 }
 
 export async function proxyPost(url: string, form: Record<string, string>): Promise<Response> {
+  const proxyTarget = url.replace(/^https?:\/\/[^\/]+/, PROXY_URL);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   try {
-    const res = await fetch(url, {
+    const res = await fetch(proxyTarget, {
       method: "POST",
       headers: {
         ...HEADERS,
