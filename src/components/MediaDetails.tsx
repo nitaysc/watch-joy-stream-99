@@ -106,7 +106,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       quality: s.quality,
       provider: s.provider,
     }));
-    setSources(mapped);
+    // Preserve any HDRezka sources that were already added
+    setSources((prev) => {
+      const hdSources = prev.filter((s) => s.provider?.name?.startsWith("HDRezka"));
+      return [...mapped, ...hdSources];
+    });
     if (mapped.length > 0) {
       setActiveIdx(0);
       setStreamUrl(mapped[0].url);
@@ -233,16 +237,10 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           setSources((prev) => {
             const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
             if (existsIdx !== -1) {
-              setActiveIdx(existsIdx);
               return prev;
             }
-            const newSources = [...prev, hdSource];
-            setActiveIdx(newSources.length - 1);
-            return newSources;
+            return [...prev, hdSource];
           });
-          
-          setStreamUrl(hdSource.url ?? null);
-          setStreamType(hdSource.type ?? "application/x-mpegURL");
           return;
         } catch (e) {
           console.error("HDRezka search failed for:", q, e);
@@ -253,7 +251,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         setHdrezkaLoading(false);
       }
     }
-  }, [title, season, episode, streamUrl]);
+  }, [title, season, episode]);
 
   useEffect(() => {
     doHdrezkaSearch();
