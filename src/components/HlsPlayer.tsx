@@ -85,6 +85,7 @@ export default function HlsPlayer({
   const [showAudioMenu, setShowAudioMenu] = useState(false);
   const [externalVtts, setExternalVtts] = useState<Record<number, string>>({});
   const [loadingSub, setLoadingSub] = useState<Set<number>>(new Set());
+  const [subError, setSubError] = useState<string | null>(null);
   const externalTrackRefs = useRef<{ fileId: number; el: HTMLTrackElement; blobUrl: string }[]>([]);
   const activeExternal = useRef<number | null>(null);
 
@@ -250,7 +251,9 @@ export default function HlsPlayer({
         const result = await getSubtitleVtt({ data: { file_id: fileId } });
         vtt = result.vtt;
         setExternalVtts((prev) => ({ ...prev, [fileId]: vtt! }));
+        setSubError(null);
       } catch {
+        setSubError("Subtitle download failed - provider may be unavailable");
         setLoadingSub((prev) => { const n = new Set(prev); n.delete(fileId); return n; });
         return;
       }
@@ -341,9 +344,16 @@ export default function HlsPlayer({
           maxBufferLength: 15,
           maxMaxBufferLength: 30,
           startLevel: 1,
-          fragLoadingTimeOut: 10000,
-          manifestLoadingTimeOut: 10000,
-          levelLoadingTimeOut: 10000,
+          fragLoadingTimeOut: 20000,
+          fragLoadingMaxRetry: 10,
+          fragLoadingRetryDelay: 500,
+          fragLoadingMaxRetryTimeout: 60000,
+          levelLoadingTimeOut: 15000,
+          levelLoadingMaxRetry: 8,
+          levelLoadingRetryDelay: 500,
+          manifestLoadingTimeOut: 15000,
+          manifestLoadingMaxRetry: 5,
+          manifestLoadingRetryDelay: 1000,
         },
         nativeAudioTracks: false,
         nativeVideoTracks: false,
@@ -664,7 +674,7 @@ export default function HlsPlayer({
             {(hasSubtitles || externalSubtitles.length > 0) && (
               <div className="relative">
                 <button
-                  onClick={(e) => { e.stopPropagation(); setShowCcm(!showCcm); setShowAudioMenu(false); setShowQualityMenu(false); setShowServerMenu(false); }}
+                  onClick={(e) => { e.stopPropagation(); setShowCcm(!showCcm); setShowAudioMenu(false); setShowQualityMenu(false); setShowServerMenu(false); setSubError(null); }}
                   className={`flex h-8 w-8 items-center justify-center rounded-xl transition-all duration-200 hover:bg-white/10 ${
                     subtitleTracks.some((t) => t.mode === "showing") || activeExternal.current !== null ? "text-primary" : "text-white/40 hover:text-white"
                   }`}
@@ -736,6 +746,9 @@ export default function HlsPlayer({
                             ) : sub.label}
                           </button>
                         ))}
+                        {subError && (
+                          <div className="px-3 py-1.5 text-[10px] text-red-400">{subError}</div>
+                        )}
                       </>
                     )}
                   </div>
