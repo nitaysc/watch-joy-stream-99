@@ -177,6 +177,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     const PROXY = "https://hdrezka-proxy.onrender.com/proxy";
 
     try {
+      console.log("HDRezka: Starting search for", title);
       // Step 1: Search HDRezka via proxy (client-side fetch)
       const searchUrl = `${PROXY}/search/?do=search&subaction=search&q=${encodeURIComponent(title)}`;
       const searchRes = await fetch(searchUrl);
@@ -186,22 +187,35 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       // Parse search results using regex (browser-safe, no node-html-parser needed)
       const itemRegex = /<div class="b-content__inline_item-link">[\s\S]*?<a href="([^"]+)">(.*?)<\/a>/g;
       let match = itemRegex.exec(searchHtml);
-      if (!match) return;
+      if (!match) {
+        console.log("HDRezka: Search regex failed");
+        return;
+      }
       const videoPageUrl = match[1]; // e.g. https://hdrezka-home.tv/series/drama/1730-pobeg-2005-latest.html
+      console.log("HDRezka: Found video page", videoPageUrl);
 
       // Step 2: Fetch the video page via proxy
       const videoProxyUrl = videoPageUrl.replace(/^https?:\/\/[^\/]+/, PROXY);
+      console.log("HDRezka: Fetching video page via proxy");
       const videoRes = await fetch(videoProxyUrl);
       if (!videoRes.ok || currentId !== hdrezkaFetchId.current) return;
       const videoHtml = await videoRes.text();
+      console.log("HDRezka: Video page fetched, length:", videoHtml.length);
 
       // Extract JSON payload using bracket matching
       const lines = videoHtml.split('\n');
       const initLine = lines.find(l => l.includes('initCDNSeriesEvents(') || l.includes('initCDNMoviesEvents('));
-      if (!initLine) return;
+      if (!initLine) {
+        console.log("HDRezka: initCDN line not found!");
+        return;
+      }
+      console.log("HDRezka: initCDN line found");
 
       const jsonStart = initLine.indexOf('{"id":"cdnplayer"');
-      if (jsonStart === -1) return;
+      if (jsonStart === -1) {
+        console.log("HDRezka: JSON start not found!");
+        return;
+      }
 
       let braceCount = 0;
       let endIdx = -1;
@@ -225,17 +239,28 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           }
       }
       
-      if (endIdx === -1) return;
+      if (endIdx === -1) {
+        console.log("HDRezka: JSON end not found!");
+        return;
+      }
       const jsnStr = initLine.substring(jsonStart, endIdx + 1);
 
       let jsn;
       try {
         jsn = JSON.parse(jsnStr);
-      } catch { return; }
+        console.log("HDRezka: JSON parsed successfully!");
+      } catch (e) { 
+        console.log("HDRezka: JSON parse failed", e);
+        return; 
+      }
 
       const idMatch = initLine.match(/initCDN(?:Series|Movies)Events\(\d+,\s*(\d+),/);
-      if (!idMatch) return;
+      if (!idMatch) {
+        console.log("HDRezka: ID match failed!");
+        return;
+      }
       const defaultTranslatorId = idMatch[1];
+      console.log("HDRezka: Default translator ID", defaultTranslatorId);
 
       // Find the translator name
       const transRegex = /data-translator_id="([^"]+)"[^>]*title="([^"]*)"/g;
@@ -258,7 +283,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         }
       }
 
-      if (!jsn.streams) return;
+      if (!jsn.streams) {
+        console.log("HDRezka: No streams in JSON!");
+        return;
+      }
+      console.log("HDRezka: Found streams in JSON");
 
       // Decode streams (they may be base64 encoded with salt removal)
       let streams = jsn.streams;
@@ -305,7 +334,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         }
       }
 
-      if (!bestHls || currentId !== hdrezkaFetchId.current) return;
+      if (!bestHls || currentId !== hdrezkaFetchId.current) {
+        console.log("HDRezka: No valid HLS stream extracted!");
+        return;
+      }
+      console.log("HDRezka: SUCCESS!", bestHls.substring(0, 50) + "...");
 
       const hdSource: ServerSource = {
         url: bestHls,
