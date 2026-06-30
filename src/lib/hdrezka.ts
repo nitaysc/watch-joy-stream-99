@@ -1,13 +1,105 @@
 import { HDREZKA_MIRRORS, HDREZKA_USER_AGENT, type HdrezkaStreamFormat } from "./hdrezka.types";
 
+/* ------------------------------------------------------------------ */
+/*  Proxy-aware fetch helpers (server-side, no CORS issues)           */
+/* ------------------------------------------------------------------ */
+
+async function proxyFetch(
+  url: string,
+  options?: RequestInit,
+): Promise<Response> {
+  // Try through a CORS-friendly proxy first (bypasses HDRezka's CF block)
+  if (!options?.method || options.method === "GET") {
+    try {
+      const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.contents) {
+          return new Response(json.contents, {
+            status: 200,
+            headers: { "content-type": res.headers.get("content-type") ?? "text/html" },
+          });
+        }
+      }
+    } catch {
+      // proxy failed, fall through
+    }
+
+    try {
+      const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(10000) });
+      if (res.ok) return res;
+    } catch {
+      // fall through
+    }
+  }
+
+  // Direct fallback (will likely fail from CF Workers)
+  return fetch(url, {
+    ...options,
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
+async function proxyPost(
+  url: string,
+  form: Record<string, string>,
+): Promise<Response> {
+  // Try codetabs proxy for POST
+  try {
+    const proxyUrl = `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams(form).toString(),
+      signal: AbortSignal.timeout(15000),
+    });
+    if (res.ok) return res;
+  } catch {
+    // fall through
+  }
+
+  // Try allorigins with GET fallback (encode body as query params)
+  try {
+    const fullUrl = `${url}&${new URLSearchParams(form).toString()}`;
+    const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(fullUrl)}`;
+    const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+    if (res.ok) {
+      const json = await res.json();
+      if (json.contents) {
+        return new Response(json.contents, {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+    }
+  } catch {
+    // fall through
+  }
+
+  // Direct POST fallback
+  const body = new URLSearchParams(form).toString();
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": HDREZKA_USER_AGENT,
+    },
+    body,
+    signal: AbortSignal.timeout(10000),
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Original module exports (signatures unchanged)                    */
+/* ------------------------------------------------------------------ */
+
 let activeMirror: string | null = null;
 
 async function probeMirror(mirror: string): Promise<boolean> {
   try {
-    const res = await fetch(mirror, {
-      headers: { "User-Agent": HDREZKA_USER_AGENT },
-      signal: AbortSignal.timeout(8000),
-    });
+    const res = await proxyFetch(mirror);
     return res.ok;
   } catch {
     return false;
@@ -38,21 +130,8 @@ export async function cdnPost(
   baseUrl: string,
   form: Record<string, string>,
 ): Promise<any> {
-  const body = new URLSearchParams(form).toString();
-  const url =
-    baseUrl +
-    `/ajax/get_cdn_series/?t=${Date.now()}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "X-Requested-With": "XMLHttpRequest",
-      "User-Agent": HDREZKA_USER_AGENT,
-      Referer: baseUrl + "/",
-    },
-    body,
-    signal: AbortSignal.timeout(15000),
-  });
+  const url = baseUrl + `/ajax/get_cdn_series/?t=${Date.now()}`;
+  const res = await proxyPost(url, form);
   if (!res.ok) throw new Error(`CDN API returned ${res.status}`);
   return res.json();
 }

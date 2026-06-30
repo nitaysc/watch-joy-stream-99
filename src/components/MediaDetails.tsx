@@ -3,7 +3,7 @@ import { RefreshCw, Languages, Loader2 } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
-import { clientSearchHDRezka, clientGetHDRezkaVideo, clientResolveStreamUrl } from "@/lib/hdrezka.web";
+import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -176,20 +176,22 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     for (const q of queries) {
       if (currentId !== hdrezkaFetchId.current) return;
       try {
-        const results = await clientSearchHDRezka(q);
+        const results = await searchHDRezka({ data: { query: q } });
         if (currentId !== hdrezkaFetchId.current) return;
         if (results.length === 0) continue;
 
-        const video = await clientGetHDRezkaVideo(results[0].url);
+        const video = await getHDRezkaVideo({ data: { url: results[0].url } });
         if (currentId !== hdrezkaFetchId.current || !video) return;
         if (video.translations.length === 0) continue;
 
         const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-        const stream = await clientResolveStreamUrl({
-          videoId: video.id,
-          translatorId: translation.id,
-          season: season ? Number(season) : undefined,
-          episode: episode ? Number(episode) : undefined,
+        const stream = await resolveStreamUrl({
+          data: {
+            videoId: video.id,
+            translatorId: translation.id,
+            season: season ? Number(season) : undefined,
+            episode: episode ? Number(episode) : undefined,
+          },
         });
         if (currentId !== hdrezkaFetchId.current || !stream) return;
 
