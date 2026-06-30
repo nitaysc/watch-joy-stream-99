@@ -90,6 +90,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const hdrezkaFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
   const [hdrezkaFound, setHdrezkaFound] = useState(false);
+  const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
@@ -218,7 +219,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         // HDRezka unavailable — non-blocking
       }
     })();
-  }, [id, mediaType, season, episode, title]);
+  }, [id, mediaType, season, episode, title, hdrezkaRetry]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
@@ -257,7 +258,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         <div className="mb-2 animate-fade-in">
           <div className="flex items-center gap-2 rounded-xl border border-green-500/20 bg-green-500/10 px-4 py-2 text-xs text-green-400 backdrop-blur-sm">
             <span className="flex h-5 w-5 items-center justify-center rounded-full bg-green-500/20 text-[10px]">🎧</span>
-            <span className="flex-1">Russian dub available — open <strong>Server</strong> dropdown in player to switch</span>
+            <span className="flex-1">Russian dub found via HDRezka — click <strong>Server</strong> in player to switch</span>
             <button
               onClick={() => setHdrezkaFound(false)}
               className="rounded-lg bg-white/5 px-2 py-1 text-[10px] text-white/40 hover:text-white/70"
@@ -326,6 +327,21 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           </div>
         )}
       </div>
+
+      {/* HDRezka — try Russian dub (always visible below player) */}
+      {streamUrl && (
+        <div className="mt-3 text-center">
+          <button
+            onClick={() => {
+              setHdrezkaFound(false);
+              setHdrezkaRetry((c) => c + 1);
+            }}
+            className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
+          >
+            Try Russian Dub (HDRezka)
+          </button>
+        </div>
+      )}
     </div>
   );
 }
