@@ -24,9 +24,7 @@ async function fetchPage(url: string): Promise<string> {
   return await res.text();
 }
 
-export const searchHDRezka = createServerFn({ method: "POST" })
-  .inputValidator((d: { query: string }) => d)
-  .handler(async ({ data }): Promise<HdrezkaSearchItem[]> => {
+export const searchHDRezka = async ({ data }: { data: { query: string } }): Promise<HdrezkaSearchItem[]> => {
     const baseUrl = await getBaseUrl();
     const searchUrl = `${baseUrl}/search/?do=search&subaction=search&q=${encodeURIComponent(data.query)}`;
     const html = await fetchPage(searchUrl);
@@ -46,11 +44,9 @@ export const searchHDRezka = createServerFn({ method: "POST" })
       });
     }
     return items;
-  });
+  };
 
-export const getHDRezkaVideo = createServerFn({ method: "POST" })
-  .inputValidator((d: { url: string }) => d)
-  .handler(async ({ data }): Promise<HdrezkaVideo | null> => {
+export const getHDRezkaVideo = async ({ data }: { data: { url: string } }): Promise<HdrezkaVideo | null> => {
     try {
       const baseUrl = await getBaseUrl();
       const url = data.url.startsWith("http") ? data.url : `${baseUrl}${data.url}`;
@@ -171,11 +167,9 @@ export const getHDRezkaVideo = createServerFn({ method: "POST" })
     } catch {
       return null;
     }
-  });
+  };
 
-export const getHDRezkaEpisodes = createServerFn({ method: "POST" })
-  .inputValidator((d: { videoId: string; translatorId: string }) => d)
-  .handler(async ({ data }): Promise<HdrezkaEpisodeMap | null> => {
+export const getHDRezkaEpisodes = async ({ data }: { data: { videoId: string; translatorId: string } }): Promise<HdrezkaEpisodeMap | null> => {
     try {
       const baseUrl = await getBaseUrl();
       const result = await cdnPost(baseUrl, {
@@ -208,21 +202,9 @@ export const getHDRezkaEpisodes = createServerFn({ method: "POST" })
     } catch {
       return null;
     }
-  });
+  };
 
-export const getHDRezkaStream = createServerFn({ method: "POST" })
-  .inputValidator(
-    (d: {
-      videoId: string;
-      translatorId: string;
-      isCamRip?: boolean;
-      isAds?: boolean;
-      isDirector?: boolean;
-      season?: number;
-      episode?: number;
-    }) => d,
-  )
-  .handler(async ({ data }): Promise<HdrezkaStream | null> => {
+export const getHDRezkaStream = async ({ data }: { data: { videoId: string; translatorId: string; season?: number; episode?: number } }): Promise<HdrezkaStream | null> => {
     try {
       const baseUrl = await getBaseUrl();
       const form: Record<string, string> = {
@@ -258,42 +240,20 @@ export const getHDRezkaStream = createServerFn({ method: "POST" })
     } catch {
       return null;
     }
-  });
+  };
 
-export const resolveStreamUrl = createServerFn({ method: "POST" })
-  .inputValidator(
-    (d: {
-      videoId: string;
-      translatorId: string;
-      season?: number;
-      episode?: number;
-      isCamRip?: boolean;
-      isAds?: boolean;
-      isDirector?: boolean;
-    }) => d,
-  )
-  .handler(async ({ data }): Promise<{ hls: string; mp4: string } | null> => {
+export const resolveStreamUrl = async ({ data }: { data: { videoId: string; translatorId: string; season?: number; episode?: number; isCamRip?: boolean; isAds?: boolean; isDirector?: boolean } }): Promise<{ hls: string; mp4: string } | null> => {
     try {
-      const stream = await getHDRezkaStream({
-        data: {
-          videoId: data.videoId,
-          translatorId: data.translatorId,
-          season: data.season,
-          episode: data.episode,
-          isCamRip: data.isCamRip,
-          isAds: data.isAds,
-          isDirector: data.isDirector,
-        },
-      });
+      const stream = await getHDRezkaStream({ data });
       if (!stream) return null;
-      const bestQuality = stream.formats["1080p"] || stream.formats["720p"] || stream.formats["480p"];
-      if (!bestQuality) {
-        const firstKey = Object.keys(stream.formats)[0];
-        if (!firstKey) return null;
-        return stream.formats[firstKey];
-      }
-      return bestQuality;
+
+      let hlsUrl = stream.formats["1080p"]?.hls || stream.formats["720p"]?.hls || stream.formats["480p"]?.hls || stream.formats["360p"]?.hls || Object.values(stream.formats)[0]?.hls;
+      let mp4Url = stream.formats["1080p"]?.mp4 || stream.formats["720p"]?.mp4 || stream.formats["480p"]?.mp4 || stream.formats["360p"]?.mp4 || Object.values(stream.formats)[0]?.mp4;
+
+      if (!hlsUrl && !mp4Url) return null;
+
+      return { hls: hlsUrl || "", mp4: mp4Url || "" };
     } catch {
       return null;
     }
-  });
+  };
