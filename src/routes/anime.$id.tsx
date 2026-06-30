@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { getAnimeInfo, getEpisodeSources, type AnimeInfo, type EpisodeSources } from "@/lib/consumet.functions";
 import HlsPlayer, { type ServerSource } from "@/components/HlsPlayer";
+import EmbedOverlay from "@/components/EmbedOverlay";
 import { Play, ChevronDown, Star, Calendar, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/anime/$id")({
