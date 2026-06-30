@@ -238,6 +238,24 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     doHdrezkaSearch();
   }, [doHdrezkaSearch]);
 
+  const [activeIframe, setActiveIframe] = useState<string | null>(null);
+
+  const loadVidSrc = () => {
+    if (mediaType === "tv") {
+      setActiveIframe(`https://vidsrc.net/embed/tv?tmdb=${id}&season=${season}&episode=${episode}`);
+    } else {
+      setActiveIframe(`https://vidsrc.net/embed/movie?tmdb=${id}`);
+    }
+  };
+
+  const loadEmbedSu = () => {
+    if (mediaType === "tv") {
+      setActiveIframe(`https://embed.su/embed/tv/${id}/${season}/${episode}`);
+    } else {
+      setActiveIframe(`https://embed.su/embed/movie/${id}`);
+    }
+  };
+
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
     setActiveIdx(idx);
@@ -272,7 +290,15 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
 
       {/* Player */}
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
-        {streamUrl ? (
+        {activeIframe ? (
+          <div className="aspect-video w-full">
+            <iframe
+              src={activeIframe}
+              allowFullScreen
+              className="h-full w-full border-0"
+            />
+          </div>
+        ) : streamUrl ? (
           <div className="aspect-video w-full">
             <HlsPlayer
               key={`${mediaType}-${id}`}
@@ -319,20 +345,43 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
-      {/* Russian dub source selector */}
-      {streamUrl && (
-        <div className="mt-3 text-center">
+      {/* External Player selectors */}
+      {(streamUrl || activeIframe) && (
+        <div className="mt-4 flex flex-wrap justify-center gap-2">
           {hdrezkaLoading ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/5 px-4 py-2 text-xs text-green-400/50">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching Russian dub...
             </span>
           ) : (
             <button
-              onClick={doHdrezkaSearch}
+              onClick={() => { setActiveIframe(null); doHdrezkaSearch(); }}
               className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
             >
               <Languages className="h-3.5 w-3.5" /> Russian Dub
             </button>
+          )}
+
+          <button
+            onClick={loadVidSrc}
+            className="inline-flex items-center gap-1.5 rounded-full bg-blue-500/10 px-4 py-2 text-xs font-medium text-blue-400 ring-1 ring-blue-500/20 transition-all hover:bg-blue-500/20 hover:ring-blue-500/40"
+          >
+            VidSrc Player
+          </button>
+
+          <button
+            onClick={loadEmbedSu}
+            className="inline-flex items-center gap-1.5 rounded-full bg-purple-500/10 px-4 py-2 text-xs font-medium text-purple-400 ring-1 ring-purple-500/20 transition-all hover:bg-purple-500/20 hover:ring-purple-500/40"
+          >
+            SuperEmbed Player
+          </button>
+          
+          {activeIframe && (
+             <button
+                onClick={() => setActiveIframe(null)}
+                className="inline-flex items-center gap-1.5 rounded-full bg-white/5 px-4 py-2 text-xs font-medium text-white/60 ring-1 ring-white/10 transition-all hover:bg-white/10 hover:text-white"
+             >
+                Return to Default Player
+             </button>
           )}
         </div>
       )}
