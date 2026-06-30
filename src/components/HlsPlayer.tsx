@@ -294,6 +294,13 @@ export default function HlsPlayer({
     activeExternal.current = null;
   }, [src]);
 
+  // Auto-dismiss subtitle error toast after 5s
+  useEffect(() => {
+    if (!subError) return;
+    const t = setTimeout(() => setSubError(null), 5000);
+    return () => clearTimeout(t);
+  }, [subError]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const p = playerRef.current;
@@ -490,6 +497,15 @@ export default function HlsPlayer({
             <Loader2 className="h-6 w-6 text-white/40" />
           </div>
           <span className="text-sm text-white/40">Playback error</span>
+        </div>
+      )}
+
+      {/* Subtitle error toast */}
+      {subError && (
+        <div className="absolute left-1/2 top-4 z-30 -translate-x-1/2 animate-fade-in">
+          <div className="rounded-xl bg-red-500/20 px-4 py-2 text-xs text-red-300 backdrop-blur-md ring-1 ring-red-500/30 shadow-lg">
+            {subError}
+          </div>
         </div>
       )}
 
