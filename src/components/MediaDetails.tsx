@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from "react";
-import { RefreshCw, Languages } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { RefreshCw, Languages, Loader2 } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
@@ -89,6 +89,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const subFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
   const [hdrezkaFound, setHdrezkaFound] = useState(false);
+  const [hdrezkaLoading, setHdrezkaLoading] = useState(false);
   const hdrezkaFetchId = useRef(0);
   const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
 
@@ -166,18 +167,23 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
 
-  useEffect(() => {
+  const doHdrezkaSearch = useCallback(async () => {
     if (!title) return;
-    const currentId = hdrezkaFetchId.current;
-    (async () => {
+    setHdrezkaLoading(true);
+    const currentId = ++hdrezkaFetchId.current;
+    const queries = [title];
+
+    for (const q of queries) {
+      if (currentId !== hdrezkaFetchId.current) return;
       try {
-        const results = await searchHDRezka({ data: { query: title } });
-        if (currentId !== hdrezkaFetchId.current || results.length === 0) return;
+        const results = await searchHDRezka({ data: { query: q } });
+        if (currentId !== hdrezkaFetchId.current) return;
+        if (results.length === 0) continue;
 
         const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-        if (currentId !== hdrezkaFetchId.current || !video || video.translations.length === 0) return;
+        if (currentId !== hdrezkaFetchId.current || !video) return;
+        if (video.translations.length === 0) continue;
 
-        // Resolve first default/russian translation
         const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
         const stream = await resolveStreamUrl({
           data: {
@@ -200,8 +206,8 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         };
 
         setHdrezkaFound(true);
-        // Auto-dismiss after 8s
-        setTimeout(() => setHdrezkaFound(false), 8000);
+        setHdrezkaLoading(false);
+        setTimeout(() => setHdrezkaFound(false), 15000);
         setSources((prev) => {
           if (prev.some((s) => s.provider?.name === hdSource.provider?.name)) return prev;
           return [...prev, hdSource];
@@ -209,11 +215,17 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         setStreamUrl((prev) => prev ? prev : hdSource.url ?? null);
         setStreamType((prev) => prev ? prev : hdSource.type ?? "application/x-mpegURL");
         setActiveIdx((prev) => streamUrl ? prev : 0);
-      } catch {
-        // HDRezka unavailable — non-blocking
+        return;
+      } catch (e) {
+        console.error("HDRezka search failed for:", q, e);
       }
-    })();
-  }, [id, mediaType, season, episode, title, hdrezkaRetry]);
+    }
+    setHdrezkaLoading(false);
+  }, [title, season, episode, streamUrl]);
+
+  useEffect(() => {
+    doHdrezkaSearch();
+  }, [doHdrezkaSearch]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
@@ -297,17 +309,24 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       </div>
 
       {/* Russian dub source selector */}
-      {streamUrl && hdrezkaFound && (
+      {streamUrl && (hdrezkaFound || hdrezkaLoading) && (
         <div className="mt-3 text-center">
-          <button
-            onClick={() => {
-              const ruIdx = sources.findIndex((s) => s.provider?.name?.includes("HDRezka"));
-              if (ruIdx >= 0) handleSourceChange(ruIdx);
-            }}
-            className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
-          >
-            <Languages className="h-3.5 w-3.5" /> Russian Dub
-          </button>
+          {hdrezkaLoading ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-green-500/5 px-4 py-2 text-xs text-green-400/50">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Searching Russian dub...
+            </span>
+          ) : (
+            <button
+              onClick={() => {
+                const ruIdx = sources.findIndex((s) => s.provider?.name?.includes("HDRezka"));
+                if (ruIdx >= 0) handleSourceChange(ruIdx);
+                else doHdrezkaSearch();
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-green-500/10 px-4 py-2 text-xs font-medium text-green-400 ring-1 ring-green-500/20 transition-all hover:bg-green-500/20 hover:ring-green-500/40"
+            >
+              <Languages className="h-3.5 w-3.5" /> Russian Dub
+            </button>
+          )}
         </div>
       )}
     </div>
