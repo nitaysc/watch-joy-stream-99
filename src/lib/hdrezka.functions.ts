@@ -24,7 +24,7 @@ async function fetchPage(url: string): Promise<string> {
   return res.text();
 }
 
-export const searchHDRezka = createServerFn({ method: "GET" })
+export const searchHDRezka = createServerFn({ method: "POST" })
   .inputValidator((d: { query: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaSearchItem[]> => {
     try {
@@ -48,7 +48,7 @@ export const searchHDRezka = createServerFn({ method: "GET" })
     }
   });
 
-export const getHDRezkaVideo = createServerFn({ method: "GET" })
+export const getHDRezkaVideo = createServerFn({ method: "POST" })
   .inputValidator((d: { url: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaVideo | null> => {
     try {
@@ -139,7 +139,7 @@ export const getHDRezkaVideo = createServerFn({ method: "GET" })
     }
   });
 
-export const getHDRezkaEpisodes = createServerFn({ method: "GET" })
+export const getHDRezkaEpisodes = createServerFn({ method: "POST" })
   .inputValidator((d: { videoId: string; translatorId: string }) => d)
   .handler(async ({ data }): Promise<HdrezkaEpisodeMap | null> => {
     try {
@@ -177,7 +177,7 @@ export const getHDRezkaEpisodes = createServerFn({ method: "GET" })
     }
   });
 
-export const getHDRezkaStream = createServerFn({ method: "GET" })
+export const getHDRezkaStream = createServerFn({ method: "POST" })
   .inputValidator(
     (d: {
       videoId: string;
@@ -227,7 +227,7 @@ export const getHDRezkaStream = createServerFn({ method: "GET" })
     }
   });
 
-export const resolveStreamUrl = createServerFn({ method: "GET" })
+export const resolveStreamUrl = createServerFn({ method: "POST" })
   .inputValidator(
     (d: {
       videoId: string;
