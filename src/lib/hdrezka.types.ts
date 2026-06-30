@@ -53,6 +53,10 @@ export const HDREZKA_MIRRORS = [
   "https://hdrezka.ag",
   "https://rezka.ag",
   "https://hdrzk.org",
+  "https://hdrezka.cm",
+  "https://hdrezka.art",
+  "https://hdrezka.uk",
+  "https://rezka.cc",
 ];
 
 export const HDREZKA_USER_AGENT =
