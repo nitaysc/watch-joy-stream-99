@@ -3,7 +3,7 @@ import { RefreshCw } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
-import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
+import EmbedOverlay from "@/components/EmbedOverlay";
 
 interface MediaDetailsProps {
   id: string | number;
