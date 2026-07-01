@@ -1,5 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { parse } from "node-html-parser";
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import path from 'path';
 import {
   getBaseUrl,
   cdnPost,
@@ -257,3 +260,30 @@ export const resolveStreamUrl = async ({ data }: { data: { videoId: string; tran
       return null;
     }
   };
+
+const execFileAsync = promisify(execFile);
+
+export const getHDRezkaNativeStream = createServerFn({ method: "GET" })
+  .validator((d: { url: string; season?: number; episode?: number; translatorId?: string }) => d)
+  .handler(async ({ data }) => {
+  try {
+    const scraperPath = path.join(process.cwd(), 'src', 'lib', 'python', 'scraper.py');
+    const args = [scraperPath, data.url];
+    if (data.season !== undefined && data.episode !== undefined) {
+      args.push(data.season.toString(), data.episode.toString());
+    }
+    if (data.translatorId !== undefined) {
+      if (args.length === 2) args.push('null', 'null');
+      args.push(data.translatorId.toString());
+    }
+
+    const pythonCmd = process.platform === 'win32' ? 'py' : 'python3';
+    const { stdout } = await execFileAsync(pythonCmd, args);
+    const result = JSON.parse(stdout);
+    if (!result.success) throw new Error(result.error);
+    return result.videos;
+  } catch (error) {
+    console.error("HDRezka Python Scraper Error:", error);
+    return null;
+  }
+});
