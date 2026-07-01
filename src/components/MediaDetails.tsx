@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, Languages, Loader2, Server } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
-import { getLampaStreams } from "@/lib/lampa.functions";
+import { getExternalIds } from "@/lib/lampa.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
 import EmbedOverlay from "@/components/EmbedOverlay";
 
@@ -158,23 +158,40 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     const currentId = ++lampaFetchId.current;
     
     try {
-      const res = await getLampaStreams({
+      const extIds = await getExternalIds({
         data: {
           id,
-          mediaType,
-          season,
-          episode,
+          mediaType
         }
       });
       
+      if (!extIds?.imdb_id) throw new Error("No IMDB ID found");
+      
+      const kRes = await fetch(`https://kinobox.tv/api/players?imdb=${extIds.imdb_id}`);
+      if (!kRes.ok) throw new Error("Kinobox API failed");
+      
+      const players = await kRes.json();
+      
       if (currentId !== lampaFetchId.current) return;
       
-      if (res && res.sources && res.sources.length > 0) {
+      if (players && Array.isArray(players) && players.length > 0) {
         setSources((prev) => {
           const newSources = [...prev];
-          for (const s of res.sources) {
-            if (!newSources.some(x => x.url === s.url)) {
-              newSources.push(s);
+          for (const p of players) {
+            if (p.iframeUrl) {
+              let finalUrl = p.iframeUrl.startsWith('//') ? 'https:' + p.iframeUrl : p.iframeUrl;
+              if (mediaType === 'tv') {
+                finalUrl += `&s=${season ?? 1}&e=${episode ?? 1}`;
+              }
+              const sUrl = finalUrl;
+              if (!newSources.some(x => x.url === sUrl)) {
+                newSources.push({
+                  url: sUrl,
+                  type: "iframe",
+                  quality: "auto",
+                  provider: { name: `Lampa (${p.source})` }
+                });
+              }
             }
           }
           return newSources;
