@@ -104,11 +104,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       quality: s.quality,
       provider: s.provider,
     }));
-    // Preserve any HDRezka sources that were already added
-    setSources((prev) => {
-      const hdSources = prev.filter((s) => s.provider?.name?.startsWith("HDRezka"));
-      return [...mapped, ...hdSources];
-    });
+    setSources(mapped);
     if (mapped.length > 0) {
       setActiveIdx(0);
       setStreamUrl(mapped[0].url);
