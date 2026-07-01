@@ -263,18 +263,16 @@ export const resolveStreamUrl = async ({ data }: { data: { videoId: string; tran
 
 const execFileAsync = promisify(execFile);
 
-export const getHDRezkaNativeStream = createServerFn({ method: "GET" })
-  .validator((d: { url: string; season?: number; episode?: number; translatorId?: string }) => d)
-  .handler(async ({ data }) => {
+export async function extractHDRezkaStreams(url: string, season?: number, episode?: number, translatorId?: string) {
   try {
     const scraperPath = path.join(process.cwd(), 'src', 'lib', 'python', 'scraper.py');
-    const args = [scraperPath, data.url];
-    if (data.season !== undefined && data.episode !== undefined) {
-      args.push(data.season.toString(), data.episode.toString());
+    const args = [scraperPath, url];
+    if (season !== undefined && episode !== undefined) {
+      args.push(season.toString(), episode.toString());
     }
-    if (data.translatorId !== undefined) {
+    if (translatorId !== undefined) {
       if (args.length === 2) args.push('null', 'null');
-      args.push(data.translatorId.toString());
+      args.push(translatorId.toString());
     }
 
     const pythonCmd = process.platform === 'win32' ? 'py' : 'python3';
@@ -286,4 +284,10 @@ export const getHDRezkaNativeStream = createServerFn({ method: "GET" })
     console.error("HDRezka Python Scraper Error:", error);
     return null;
   }
-});
+}
+
+export const getHDRezkaNativeStream = createServerFn({ method: "GET" })
+  .validator((d: { url: string; season?: number; episode?: number; translatorId?: string }) => d)
+  .handler(async ({ data }) => {
+    return extractHDRezkaStreams(data.url, data.season, data.episode, data.translatorId);
+  });

@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getMovie, getTv } from "./tmdb.functions";
-import { searchHDRezka, getHDRezkaNativeStream } from "./hdrezka.functions";
+import { searchHDRezka, extractHDRezkaStreams } from "./hdrezka.functions";
 
 interface Source {
   url: string;
@@ -95,7 +95,7 @@ export const getStreams = createServerFn({ method: "GET" })
                 const season = data.mediaType === "tv" ? Number(data.season || 1) : undefined;
                 const episode = data.mediaType === "tv" ? Number(data.episode || 1) : undefined;
 
-                const videos = await getHDRezkaNativeStream({ data: { url: hdrezkaUrl, season, episode } });
+                const videos = await extractHDRezkaStreams(hdrezkaUrl, season, episode);
                 
                 if (videos) {
                     const qualities = Object.keys(videos);
