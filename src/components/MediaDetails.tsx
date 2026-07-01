@@ -227,13 +227,17 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
 
           // Fallback: try the POST endpoint (requires cookies)
           if (!hlsUrl) {
-            pushLog("HDRezka: No defaultStream HLS, calling resolveStreamUrl...");
+            // For series, default to season 1 episode 1 if not specified
+            const isSeries = video.type === 'series' || video.type === 'drama' || video.type === 'comedy' || video.type === 'fiction' || video.type === 'fantasy' || video.type === 'thriller' || video.type === 'horror' || video.type === 'action' || video.type === 'animation' || video.type === 'documentary' || results[0].url.includes('/series/');
+            const s = season ? Number(season) : (isSeries ? 1 : undefined);
+            const e = episode ? Number(episode) : (isSeries ? 1 : undefined);
+            pushLog(`HDRezka: No defaultStream HLS, calling resolveStreamUrl with id=${video.id}, translatorId=${translation.id}, season=${s}, episode=${e}...`);
             const stream = await resolveStreamUrl({
               data: {
                 videoId: video.id,
                 translatorId: translation.id,
-                season: season ? Number(season) : undefined,
-                episode: episode ? Number(episode) : undefined,
+                season: s,
+                episode: e,
               },
             });
             pushLog(`HDRezka: resolveStreamUrl result: ${stream ? 'Success' : 'Null'}`);
