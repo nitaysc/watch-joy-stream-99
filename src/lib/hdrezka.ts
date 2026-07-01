@@ -12,13 +12,18 @@ const HEADERS = {
 };
 
 const PROXY_URL = "https://hdrezka-proxy.onrender.com/proxy";
+const FETCH_PAGE_URL = "https://hdrezka-proxy.onrender.com/fetch-page";
 
 export async function proxyFetch(url: string, _options?: RequestInit): Promise<Response> {
-  const proxyTarget = url.replace(/^https?:\/\/[^\/]+/, PROXY_URL);
+  // Extract the path from the URL to use with /fetch-page endpoint
+  const urlObj = new URL(url);
+  const path = urlObj.pathname + urlObj.search;
+  const fetchUrl = `${FETCH_PAGE_URL}?path=${encodeURIComponent(path)}`;
+  
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   try {
-    const res = await fetch(proxyTarget, { headers: HEADERS, signal: controller.signal, cache: "no-store" });
+    const res = await fetch(fetchUrl, { headers: HEADERS, signal: controller.signal, cache: "no-store" });
     clearTimeout(timeout);
     if (res.ok) return res;
     throw new Error(`Direct fetch returned ${res.status} for ${url}`);
