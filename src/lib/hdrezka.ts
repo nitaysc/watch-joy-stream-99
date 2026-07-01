@@ -11,8 +11,9 @@ const HEADERS = {
   "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
 };
 
-const PROXY_URL = "https://hdrezka-proxy.onrender.com/proxy";
-const FETCH_PAGE_URL = "https://hdrezka-proxy.onrender.com/fetch-page";
+const PROXY_BASE = "https://hdrezka-proxy.onrender.com";
+const PROXY_URL = PROXY_BASE + "/proxy";
+const FETCH_PAGE_URL = PROXY_BASE + "/fetch-page";
 
 export async function proxyFetch(url: string, _options?: RequestInit): Promise<Response> {
   // Extract the path from the URL to use with /fetch-page endpoint
@@ -34,14 +35,17 @@ export async function proxyFetch(url: string, _options?: RequestInit): Promise<R
 }
 
 export async function proxyPost(url: string, form: Record<string, string>): Promise<Response> {
-  const proxyTarget = url.replace(/^https?:\/\/[^\/]+/, PROXY_URL);
+  // Extract the path from the URL to use with /post-ajax endpoint
+  const urlObj = new URL(url);
+  const path = urlObj.pathname + urlObj.search;
+  const postUrl = `${PROXY_BASE}/post-ajax?path=${encodeURIComponent(path)}`;
+  
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), TIMEOUT);
   try {
-    const res = await fetch(proxyTarget, {
+    const res = await fetch(postUrl, {
       method: "POST",
       headers: {
-        ...HEADERS,
         "Content-Type": "application/x-www-form-urlencoded",
       },
       body: new URLSearchParams(form).toString(),
