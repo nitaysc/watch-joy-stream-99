@@ -10,7 +10,8 @@ interface Source {
 
 // Map TMDB ID to IMDB/Kinopoisk ID
 async function getExternalIds(tmdbId: string | number, mediaType: string) {
-  const apiKey = process.env.VITE_TMDB_API_KEY || "8d6d91941230817f7807d643736e8a49";
+  const apiKey = process.env.TMDB_API_KEY;
+  if (!apiKey) throw new Error("TMDB_API_KEY is not configured");
   const url = `https://api.themoviedb.org/3/${mediaType === "tv" ? "tv" : "movie"}/${tmdbId}/external_ids?api_key=${apiKey}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error("Failed to fetch external IDs");
