@@ -117,11 +117,11 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }
   };
 
-  // Russian Dub is served via iframe embed (vidsrc.cc with defaultLanguage=ru).
+  // Russian Dub is served via iframe embed. vidsrc.xyz and vidsrc.cc are used.
   const russianEmbedUrl =
     mediaType === "tv"
-      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
-      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
+      ? `https://vidsrc.xyz/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
+      : `https://vidsrc.xyz/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
 
   const doHdrezkaSearch = useCallback(() => {
     const currentId = ++hdrezkaFetchId.current;
@@ -163,19 +163,29 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     
     try {
       // The Kinobox API has been closed and actively penalizes requests.
-      // We fall back to the most reliable free Russian CDN: vidsrc.cc with ru defaults.
+      // We fall back to multiple reliable free Russian/Global CDN embeds to bypass ISP DNS blocks.
       setSources((prev) => {
         const newSources = [...prev];
-        const vidsrcRu = {
-          url: russianEmbedUrl,
-          type: "iframe",
-          quality: "auto",
-          provider: { name: "Lampa (VidSrc RU)" }
-        };
         
-        if (!newSources.some(x => x.url === vidsrcRu.url)) {
-          newSources.push(vidsrcRu);
+        const providers = [
+          { name: "Lampa (VidSrc XYZ)", url: mediaType === "tv" ? `https://vidsrc.xyz/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru` : `https://vidsrc.xyz/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru` },
+          { name: "Lampa (VidSrc CC)", url: mediaType === "tv" ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru` : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru` },
+          { name: "Global (Embed.su)", url: mediaType === "tv" ? `https://embed.su/embed/tv/${id}/${season ?? 1}/${episode ?? 1}` : `https://embed.su/embed/movie/${id}` },
+          { name: "Global (VidSrc.me)", url: mediaType === "tv" ? `https://vidsrc.me/embed/tv?tmdb=${id}&season=${season ?? 1}&episode=${episode ?? 1}` : `https://vidsrc.me/embed/movie?tmdb=${id}` },
+          { name: "Global (SuperEmbed)", url: mediaType === "tv" ? `https://multiembed.mov/?video_id=${id}&tmdb=1&s=${season ?? 1}&e=${episode ?? 1}` : `https://multiembed.mov/?video_id=${id}&tmdb=1` },
+        ];
+        
+        for (const p of providers) {
+          if (!newSources.some(x => x.url === p.url)) {
+            newSources.push({
+              url: p.url,
+              type: "iframe",
+              quality: "auto",
+              provider: { name: p.name }
+            });
+          }
         }
+        
         return newSources;
       });
     } catch (e: any) {
