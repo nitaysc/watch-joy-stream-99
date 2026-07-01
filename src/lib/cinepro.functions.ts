@@ -1,5 +1,4 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getMovie, getTv } from "./tmdb.functions";
 import { searchHDRezka, extractHDRezkaStreams } from "./hdrezka.functions";
 
 interface Source {
@@ -77,25 +76,37 @@ export const getStreams = createServerFn({ method: "GET" })
 
     // ADD HDREZKA NATIVE STREAMS
     try {
+        console.log("CINEPRO: STARTING HDREZKA ADDITION");
         let titleQuery = "";
-        if (data.mediaType === "tv") {
-            const tvInfo = await getTv({ data: { id: String(data.id) } });
-            titleQuery = tvInfo.title || tvInfo.original_title || "";
+        const TMDB_API_KEY = process.env.TMDB_API_KEY;
+        if (TMDB_API_KEY) {
+            const tmdbUrl = `https://api.themoviedb.org/3/${data.mediaType}/${data.id}?api_key=${TMDB_API_KEY}`;
+            console.log("CINEPRO: Fetching TMDB", tmdbUrl);
+            const tmdbRes = await fetch(tmdbUrl);
+            if (tmdbRes.ok) {
+                const tmdbJson = await tmdbRes.json();
+                titleQuery = tmdbJson.title || tmdbJson.name || tmdbJson.original_title || tmdbJson.original_name || "";
+                console.log("CINEPRO: Title Query Result =", titleQuery);
+            } else {
+                console.log("CINEPRO: TMDB Fetch Failed", tmdbRes.status);
+            }
         } else {
-            const movieInfo = await getMovie({ data: { id: String(data.id) } });
-            titleQuery = movieInfo.title || movieInfo.original_title || "";
+            console.log("CINEPRO: TMDB_API_KEY missing");
         }
 
         if (titleQuery) {
             const searchResults = await searchHDRezka({ data: { query: titleQuery } });
+            console.log("CINEPRO: searchHDRezka found", searchResults?.length);
             if (searchResults && searchResults.length > 0) {
                 // Assuming first result is the best match
                 const hdrezkaUrl = searchResults[0].url;
+                console.log("CINEPRO: Extracting streams from", hdrezkaUrl);
                 
                 const season = data.mediaType === "tv" ? Number(data.season || 1) : undefined;
                 const episode = data.mediaType === "tv" ? Number(data.episode || 1) : undefined;
 
                 const videos = await extractHDRezkaStreams(hdrezkaUrl, season, episode);
+                console.log("CINEPRO: Extracted videos:", videos ? Object.keys(videos) : null);
                 
                 if (videos) {
                     const qualities = Object.keys(videos);
