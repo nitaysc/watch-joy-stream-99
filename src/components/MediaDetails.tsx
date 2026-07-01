@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw, Languages, Loader2 } from "lucide-react";
+import { RefreshCw, Languages } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
-import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
+import EmbedOverlay from "@/components/EmbedOverlay";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -89,10 +89,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const fetchId = useRef(0);
   const subFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
-  const [hdrezkaFound, setHdrezkaFound] = useState(false);
-  const [hdrezkaLoading, setHdrezkaLoading] = useState(false);
-  const hdrezkaFetchId = useRef(0);
-  const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
+  const [showRussianEmbed, setShowRussianEmbed] = useState(false);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
@@ -107,11 +104,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       quality: s.quality,
       provider: s.provider,
     }));
-    // Preserve any HDRezka sources that were already added
-    setSources((prev) => {
-      const hdSources = prev.filter((s) => s.provider?.name?.startsWith("HDRezka"));
-      return [...mapped, ...hdSources];
-    });
+    setSources(mapped);
     if (mapped.length > 0) {
       setActiveIdx(0);
       setStreamUrl(mapped[0].url);
@@ -172,117 +165,14 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
 
-  const doHdrezkaSearch = useCallback(async () => {
-    if (!title) return;
-    setHdrezkaLoading(true);
-    const currentId = ++hdrezkaFetchId.current;
-    const queries = [title];
+  // Russian Dub is served via iframe embed (vidsrc.cc with defaultLanguage=ru).
+  // The previous HDRezka scraper is disabled because its upstream proxy no longer
+  // preserves session cookies, so all CDN calls returned "session expired".
+  const russianEmbedUrl =
+    mediaType === "tv"
+      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
+      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
 
-    try {
-      for (const q of queries) {
-        if (currentId !== hdrezkaFetchId.current) return;
-        try {
-          const pushLog = (msg: string) => {
-            console.log(msg);
-            setDebugLogs(prev => [...prev, msg]);
-          };
-
-          pushLog(`HDRezka: Searching for ${q}`);
-          const results = await searchHDRezka({ data: { query: q } });
-          pushLog(`HDRezka: Search results: ${results.length}`);
-          if (currentId !== hdrezkaFetchId.current) return;
-          if (results.length === 0) continue;
-
-          pushLog(`HDRezka: Fetching video for ${results[0].url}`);
-          const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-          if (currentId !== hdrezkaFetchId.current) return;
-          if (!video) {
-            pushLog("HDRezka: getHDRezkaVideo returned null!");
-            return;
-          }
-          if (video.translations.length === 0) {
-            pushLog("HDRezka: Video has no translations!");
-            continue;
-          }
-
-          const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-          pushLog(`HDRezka: Selected translation: ${translation.name}`);
-
-          // First try: use the stream data already embedded in the page HTML (always works)
-          let hlsUrl = "";
-          let streamType = "application/x-mpegURL";
-
-          if (video.defaultStream) {
-            pushLog(`HDRezka: Using defaultStream formats: ${Object.keys(video.defaultStream.formats).join(',')}`);
-            const bestKey = Object.keys(video.defaultStream.formats).find(k => k === "1080p")
-              || Object.keys(video.defaultStream.formats).find(k => k === "720p")
-              || Object.keys(video.defaultStream.formats).find(k => k === "480p")
-              || Object.keys(video.defaultStream.formats)[0];
-            if (bestKey) {
-              const best = video.defaultStream.formats[bestKey];
-              hlsUrl = best.hls || best.mp4;
-              if (!best.hls && best.mp4) streamType = "video/mp4";
-            }
-          }
-
-          // Fallback: try the POST endpoint (requires cookies)
-          if (!hlsUrl) {
-            // For series, default to season 1 episode 1 if not specified
-            const isSeries = video.type === 'series' || video.type === 'drama' || video.type === 'comedy' || video.type === 'fiction' || video.type === 'fantasy' || video.type === 'thriller' || video.type === 'horror' || video.type === 'action' || video.type === 'animation' || video.type === 'documentary' || results[0].url.includes('/series/');
-            const s = season ? Number(season) : (isSeries ? 1 : undefined);
-            const e = episode ? Number(episode) : (isSeries ? 1 : undefined);
-            pushLog(`HDRezka: No defaultStream HLS, calling resolveStreamUrl with id=${video.id}, translatorId=${translation.id}, season=${s}, episode=${e}...`);
-            const stream = await resolveStreamUrl({
-              data: {
-                videoId: video.id,
-                translatorId: translation.id,
-                season: s,
-                episode: e,
-              },
-            });
-            pushLog(`HDRezka: resolveStreamUrl result: ${stream ? 'Success' : 'Null'}`);
-            if (currentId !== hdrezkaFetchId.current || !stream) return;
-            hlsUrl = stream.hls || stream.mp4;
-            if (!stream.hls && stream.mp4) streamType = "video/mp4";
-          }
-
-          if (!hlsUrl) {
-            pushLog("HDRezka: NO HLS URL EXTRACTED!");
-            return;
-          }
-
-          const hdSource: ServerSource = {
-            url: hlsUrl,
-            type: streamType,
-            quality: "1080p",
-            provider: { name: `HDRezka — ${translation.name}` },
-          };
-
-          pushLog(`HDRezka: SUCCESS! Added ${hdSource.provider.name}`);
-          
-          setSources((prev) => {
-            const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
-            if (existsIdx !== -1) {
-              return prev;
-            }
-            return [...prev, hdSource];
-          });
-          return;
-        } catch (e: any) {
-          console.error("HDRezka Server-Side fetch failed:", e);
-          setDebugLogs(prev => [...prev, `HDRezka ERROR: ${e.message}`]);
-        }
-      }
-    } finally {
-      if (currentId === hdrezkaFetchId.current) {
-        setHdrezkaLoading(false);
-      }
-    }
-  }, [title, season, episode]);
-
-  useEffect(() => {
-    doHdrezkaSearch();
-  }, [doHdrezkaSearch]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
@@ -379,7 +269,25 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
+      {/* Russian Dub — opens vidsrc.cc embed in overlay */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => setShowRussianEmbed(true)}
+          className="flex items-center gap-2 rounded-lg bg-green-600/20 px-4 py-2 text-sm font-medium text-green-300 ring-1 ring-green-500/30 transition hover:bg-green-600/30 hover:text-green-200"
+        >
+          <Languages className="h-4 w-4" /> Open Russian Dub
+        </button>
+      </div>
+
+      {showRussianEmbed && (
+        <EmbedOverlay
+          src={russianEmbedUrl}
+          title={`${title ?? "Russian Dub"} — Russian`}
+          onClose={() => setShowRussianEmbed(false)}
+        />
+      )}
     </div>
   );
 }
+
 
