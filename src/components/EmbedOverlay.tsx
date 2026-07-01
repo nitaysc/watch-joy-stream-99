@@ -34,7 +34,7 @@ export default function EmbedOverlay({ src, title, onClose }: EmbedOverlayProps)
   const [loading, setLoading] = useState(true);
   const fallbacks = getFallbackUrls(src);
   const fallbackIdx = useRef(-1);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   const tryFallback = useCallback(() => {
     const nextIdx = fallbackIdx.current + 1;
