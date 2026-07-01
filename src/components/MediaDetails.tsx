@@ -89,10 +89,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const fetchId = useRef(0);
   const subFetchId = useRef(0);
   const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
-  const [hdrezkaFound, setHdrezkaFound] = useState(false);
-  const [hdrezkaLoading, setHdrezkaLoading] = useState(false);
-  const hdrezkaFetchId = useRef(0);
-  const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
+  const [showRussianEmbed, setShowRussianEmbed] = useState(false);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
