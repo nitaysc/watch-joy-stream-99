@@ -4,7 +4,7 @@ import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/component
 import { getStreams } from "@/lib/cinepro.functions";
 import { getLampaStreams } from "@/lib/lampa.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
-import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
+import EmbedOverlay from "@/components/EmbedOverlay";
 
 interface MediaDetailsProps {
   id: string | number;
@@ -87,16 +87,15 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const [sources, setSources] = useState<ServerSource[]>([]);
   const [activeIdx, setActiveIdx] = useState(0);
   const [debugLogs, setDebugLogs] = useState<string[]>([]);
-  const fetchId = useRef(0);
-  const subFetchId = useRef(0);
-  const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
-  const [hdrezkaFound, setHdrezkaFound] = useState(false);
   const [hdrezkaLoading, setHdrezkaLoading] = useState(false);
   const hdrezkaFetchId = useRef(0);
   const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
 
   const [lampaLoading, setLampaLoading] = useState(false);
   const lampaFetchId = useRef(0);
+  const subFetchId = useRef(0);
+  const [subtitles, setSubtitles] = useState<ExternalSubtitle[]>([]);
+  const [showRussianEmbed, setShowRussianEmbed] = useState(false);
 
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
@@ -111,11 +110,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       quality: s.quality,
       provider: s.provider,
     }));
-    // Preserve any HDRezka sources that were already added
-    setSources((prev) => {
-      const hdSources = prev.filter((s) => s.provider?.name?.startsWith("HDRezka"));
-      return [...mapped, ...hdSources];
-    });
+    setSources(mapped);
     if (mapped.length > 0) {
       setActiveIdx(0);
       setStreamUrl(mapped[0].url);
@@ -123,166 +118,39 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }
   };
 
-  const fetchStreams = () => {
-    const currentId = ++fetchId.current;
+  const doHdrezkaSearch = useCallback(() => {
+    const currentId = ++hdrezkaFetchId.current;
     const key = cacheKey(id, mediaType, season, episode);
 
     const cached = getCache(key);
-    if (cached && currentId === fetchId.current) {
+    if (cached && currentId === hdrezkaFetchId.current) {
       applySources(cached);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    setHdrezkaLoading(true);
     setError(null);
     setStreamUrl(null);
 
     getStreams({ data: { id, mediaType, season, episode } })
       .then((data) => {
-        if (currentId !== fetchId.current) return;
+        if (currentId !== hdrezkaFetchId.current) return;
         if (!data.sources?.length) throw new Error("No sources returned");
         const sorted = [...data.sources].sort(sortSources);
         setCache(key, sorted, data.expiresAt);
         applySources(sorted);
       })
       .catch((err) => {
-        if (currentId !== fetchId.current) return;
+        if (currentId !== hdrezkaFetchId.current) return;
         setError(err.message);
       })
       .finally(() => {
-        if (currentId === fetchId.current) setIsLoading(false);
-      });
-  };
-
-  useEffect(fetchStreams, [id, mediaType, season, episode]);
-
-  // Fetch subtitles independently from streams
-  useEffect(() => {
-    const fetchSubId = ++subFetchId.current;
-    const tmdbId = Number(id);
-    if (!tmdbId) return;
-    searchSubtitles({ data: {
-      tmdbId,
-      season: season ? Number(season) : undefined,
-      episode: episode ? Number(episode) : undefined,
-    }}).then((subs) => {
-      if (fetchSubId !== subFetchId.current) return;
-      setSubtitles(subs.map((s) => ({
-        file_id: s.file_id,
-        language: s.language,
-        label: s.language_english_name + (s.hearing_impaired ? " [HI]" : ""),
-      })));
-    }).catch(() => {});
-  }, [id, mediaType, season, episode]);
-
-  const doHdrezkaSearch = useCallback(async () => {
-    if (!title) return;
-    setHdrezkaLoading(true);
-    const currentId = ++hdrezkaFetchId.current;
-    const queries = [title];
-
-    try {
-      for (const q of queries) {
-        if (currentId !== hdrezkaFetchId.current) return;
-        try {
-          const pushLog = (msg: string) => {
-            console.log(msg);
-            setDebugLogs(prev => [...prev, msg]);
-          };
-
-          pushLog(`HDRezka: Searching for ${q}`);
-          const results = await searchHDRezka({ data: { query: q } });
-          pushLog(`HDRezka: Search results: ${results.length}`);
-          if (currentId !== hdrezkaFetchId.current) return;
-          if (results.length === 0) continue;
-
-          pushLog(`HDRezka: Fetching video for ${results[0].url}`);
-          const video = await getHDRezkaVideo({ data: { url: results[0].url } });
-          if (currentId !== hdrezkaFetchId.current) return;
-          if (!video) {
-            pushLog("HDRezka: getHDRezkaVideo returned null!");
-            return;
-          }
-          if (video.translations.length === 0) {
-            pushLog("HDRezka: Video has no translations!");
-            continue;
-          }
-
-          const translation = video.translations.find((t) => t.isDefault) || video.translations[0];
-          pushLog(`HDRezka: Selected translation: ${translation.name}`);
-
-          // First try: use the stream data already embedded in the page HTML (always works)
-          let hlsUrl = "";
-          let streamType = "application/x-mpegURL";
-
-          if (video.defaultStream) {
-            pushLog(`HDRezka: Using defaultStream formats: ${Object.keys(video.defaultStream.formats).join(',')}`);
-            const bestKey = Object.keys(video.defaultStream.formats).find(k => k === "1080p")
-              || Object.keys(video.defaultStream.formats).find(k => k === "720p")
-              || Object.keys(video.defaultStream.formats).find(k => k === "480p")
-              || Object.keys(video.defaultStream.formats)[0];
-            if (bestKey) {
-              const best = video.defaultStream.formats[bestKey];
-              hlsUrl = best.hls || best.mp4;
-              if (!best.hls && best.mp4) streamType = "video/mp4";
-            }
-          }
-
-          // Fallback: try the POST endpoint (requires cookies)
-          if (!hlsUrl) {
-            // For series, default to season 1 episode 1 if not specified
-            const isSeries = video.type === 'series' || video.type === 'drama' || video.type === 'comedy' || video.type === 'fiction' || video.type === 'fantasy' || video.type === 'thriller' || video.type === 'horror' || video.type === 'action' || video.type === 'animation' || video.type === 'documentary' || results[0].url.includes('/series/');
-            const s = season ? Number(season) : (isSeries ? 1 : undefined);
-            const e = episode ? Number(episode) : (isSeries ? 1 : undefined);
-            pushLog(`HDRezka: No defaultStream HLS, calling resolveStreamUrl with id=${video.id}, translatorId=${translation.id}, season=${s}, episode=${e}...`);
-            const stream = await resolveStreamUrl({
-              data: {
-                videoId: video.id,
-                translatorId: translation.id,
-                season: s,
-                episode: e,
-              },
-            });
-            pushLog(`HDRezka: resolveStreamUrl result: ${stream ? 'Success' : 'Null'}`);
-            if (currentId !== hdrezkaFetchId.current || !stream) return;
-            hlsUrl = stream.hls || stream.mp4;
-            if (!stream.hls && stream.mp4) streamType = "video/mp4";
-          }
-
-          if (!hlsUrl) {
-            pushLog("HDRezka: NO HLS URL EXTRACTED!");
-            return;
-          }
-
-          const hdSource: ServerSource = {
-            url: hlsUrl,
-            type: streamType,
-            quality: "1080p",
-            provider: { name: `HDRezka — ${translation.name}` },
-          };
-
-          pushLog(`HDRezka: SUCCESS! Added ${hdSource.provider?.name}`);
-          
-          setSources((prev) => {
-            const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
-            if (existsIdx !== -1) {
-              return prev;
-            }
-            return [...prev, hdSource];
-          });
-          return;
-        } catch (e: any) {
-          console.error("HDRezka Server-Side fetch failed:", e);
-          setDebugLogs(prev => [...prev, `HDRezka ERROR: ${e.message}`]);
+        if (currentId === hdrezkaFetchId.current) {
+          setHdrezkaLoading(false);
         }
-      }
-    } finally {
-      if (currentId === hdrezkaFetchId.current) {
-        setHdrezkaLoading(false);
-      }
-    }
-  }, [title, season, episode]);
+      });
+  }, [id, mediaType, season, episode, hdrezkaRetry]);
 
   const doLampaSearch = useCallback(async () => {
     if (!id || !mediaType) return;
@@ -327,6 +195,32 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     doLampaSearch();
   }, [doHdrezkaSearch, doLampaSearch]);
 
+  // Fetch subtitles independently from streams
+  useEffect(() => {
+    const fetchSubId = ++subFetchId.current;
+    const tmdbId = Number(id);
+    if (!tmdbId) return;
+    searchSubtitles({ data: {
+      tmdbId,
+      season: season ? Number(season) : undefined,
+      episode: episode ? Number(episode) : undefined,
+    }}).then((subs) => {
+      if (fetchSubId !== subFetchId.current) return;
+      setSubtitles(subs.map((s) => ({
+        file_id: s.file_id,
+        language: s.language,
+        label: s.language_english_name + (s.hearing_impaired ? " [HI]" : ""),
+      })));
+    }).catch(() => {});
+  }, [id, mediaType, season, episode]);
+
+  // Russian Dub is served via iframe embed (vidsrc.cc with defaultLanguage=ru).
+  const russianEmbedUrl =
+    mediaType === "tv"
+      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
+      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
+
+
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
     setActiveIdx(idx);
@@ -340,17 +234,15 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     handleSourceChange(nextIdx);
   };
 
-  const currentProvider = sources[activeIdx]?.provider?.name ?? "";
-
   return (
     <div className="mx-auto w-full max-w-5xl">
       {/* Error */}
-      {error && (
+      {error && !sources.length && (
         <div className="mb-4 animate-fade-in">
           <div className="flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 px-5 py-3.5 text-sm text-red-400 backdrop-blur-sm">
             <span className="flex-1">{error}</span>
             <button
-              onClick={fetchStreams}
+              onClick={() => setHdrezkaRetry(prev => prev + 1)}
               className="flex items-center gap-1.5 rounded-lg bg-red-500/20 px-3 py-1.5 text-xs font-medium transition hover:bg-red-500/30"
             >
               <RefreshCw className="h-3 w-3" /> Retry
@@ -363,7 +255,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       {debugLogs.length > 0 && (
         <div className="mx-auto max-w-6xl px-4 pb-4">
           <div className="rounded-xl bg-black/80 border border-white/10 p-4 font-mono text-xs text-white/70 overflow-hidden break-all">
-            <h3 className="text-white font-bold mb-2">HDRezka Debug Logs</h3>
+            <h3 className="text-white font-bold mb-2">Provider Debug Logs</h3>
             {debugLogs.map((log, i) => (
               <div key={i} className={log.includes("ERROR") || log.includes("null") || log.includes("NO HLS") ? "text-red-400" : log.includes("SUCCESS") ? "text-green-400" : ""}>
                 {log}
@@ -399,7 +291,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
           </div>
         ) : (
           <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.01]">
-            {isLoading ? (
+            {(hdrezkaLoading || lampaLoading) ? (
               <div className="flex flex-col items-center gap-4">
                 <div className="relative flex h-10 w-10 items-center justify-center">
                   <svg className="h-10 w-10 animate-spin text-primary" viewBox="0 0 24 24" fill="none">
@@ -409,61 +301,45 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
                   <div className="absolute h-3 w-3 rounded-full bg-primary animate-pulse" />
                 </div>
                 <span className="text-sm text-white/40">Finding streams...</span>
+                <div className="flex items-center gap-2 text-xs text-white/20 mt-2">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  <span>Searching external providers...</span>
+                </div>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
                 <span className="text-sm text-white/30">No streams available</span>
                 <button
-                  onClick={fetchStreams}
+                  onClick={() => setHdrezkaRetry(prev => prev + 1)}
                   className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-1.5 text-xs text-white/40 ring-1 ring-white/10 hover:bg-white/10 hover:text-white/60"
                 >
                   <RefreshCw className="h-3 w-3" /> Try again
                 </button>
-                <span className="text-[10px] text-white/20">or</span>
               </div>
             )}
           </div>
         )}
       </div>
 
-      {sources.length > 0 && (
-        <div className="mt-6">
-          <h3 className="text-sm font-medium text-white/60 mb-3 px-1">Available Servers</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {sources.map((src, idx) => (
-              <button
-                key={idx}
-                onClick={() => handleSourceChange(idx)}
-                className={`flex flex-col gap-1 items-start px-4 py-3 rounded-xl border text-left transition-all ${
-                  idx === activeIdx
-                    ? "border-purple-500/50 bg-purple-500/10 text-purple-200"
-                    : "border-white/5 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Server className="w-4 h-4" />
-                  <span className="font-medium text-sm text-white">
-                    {src.provider?.name || `Server ${idx + 1}`}
-                  </span>
-                </div>
-                {src.type !== "iframe" && (
-                  <span className="text-xs font-mono opacity-60">
-                    {src.quality} • {src.type?.split("/")[1]?.toUpperCase() || "HLS"}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
+      {/* Russian Dub — opens vidsrc.cc embed in overlay */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => setShowRussianEmbed(true)}
+          className="flex items-center gap-2 rounded-lg bg-green-600/20 px-4 py-2 text-sm font-medium text-green-300 ring-1 ring-green-500/30 transition hover:bg-green-600/30 hover:text-green-200"
+        >
+          <Languages className="h-4 w-4" /> Open Russian Dub
+        </button>
+      </div>
 
-          {(hdrezkaLoading || lampaLoading) && (
-            <div className="flex items-center gap-2 text-sm text-gray-500 mt-4">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Searching external providers...</span>
-            </div>
-          )}
-        </div>
+      {showRussianEmbed && (
+        <EmbedOverlay
+          src={russianEmbedUrl}
+          title={`${title ?? "Russian Dub"} — Russian`}
+          onClose={() => setShowRussianEmbed(false)}
+        />
       )}
     </div>
   );
-
 }
+
+
