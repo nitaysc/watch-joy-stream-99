@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { RefreshCw, Languages, Loader2, Server } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
-import { getExternalIds } from "@/lib/lampa.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
 import EmbedOverlay from "@/components/EmbedOverlay";
 
@@ -118,6 +117,12 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }
   };
 
+  // Russian Dub is served via iframe embed (vidsrc.cc with defaultLanguage=ru).
+  const russianEmbedUrl =
+    mediaType === "tv"
+      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
+      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
+
   const doHdrezkaSearch = useCallback(() => {
     const currentId = ++hdrezkaFetchId.current;
     const key = cacheKey(id, mediaType, season, episode);
@@ -155,57 +160,30 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const doLampaSearch = useCallback(async () => {
     if (!id || !mediaType) return;
     setLampaLoading(true);
-    const currentId = ++lampaFetchId.current;
     
     try {
-      const extIds = await getExternalIds({
-        data: {
-          id,
-          mediaType
+      // The Kinobox API has been closed and actively penalizes requests.
+      // We fall back to the most reliable free Russian CDN: vidsrc.cc with ru defaults.
+      setSources((prev) => {
+        const newSources = [...prev];
+        const vidsrcRu = {
+          url: russianEmbedUrl,
+          type: "iframe",
+          quality: "auto",
+          provider: { name: "Lampa (VidSrc RU)" }
+        };
+        
+        if (!newSources.some(x => x.url === vidsrcRu.url)) {
+          newSources.push(vidsrcRu);
         }
+        return newSources;
       });
-      
-      if (!extIds?.imdb_id) throw new Error("No IMDB ID found");
-      
-      const kRes = await fetch(`https://kinobox.tv/api/players?imdb=${extIds.imdb_id}`);
-      if (!kRes.ok) throw new Error("Kinobox API failed");
-      
-      const players = await kRes.json();
-      
-      if (currentId !== lampaFetchId.current) return;
-      
-      if (players && Array.isArray(players) && players.length > 0) {
-        setSources((prev) => {
-          const newSources = [...prev];
-          for (const p of players) {
-            if (p.iframeUrl) {
-              let finalUrl = p.iframeUrl.startsWith('//') ? 'https:' + p.iframeUrl : p.iframeUrl;
-              if (mediaType === 'tv') {
-                finalUrl += `&s=${season ?? 1}&e=${episode ?? 1}`;
-              }
-              const sUrl = finalUrl;
-              if (!newSources.some(x => x.url === sUrl)) {
-                newSources.push({
-                  url: sUrl,
-                  type: "iframe",
-                  quality: "auto",
-                  provider: { name: `Lampa (${p.source})` }
-                });
-              }
-            }
-          }
-          return newSources;
-        });
-      }
     } catch (e: any) {
-      console.error("Lampa fetch failed:", e);
-      setDebugLogs(prev => [...prev, `Lampa ERROR: ${e.message}`]);
+      console.error("Lampa fallback failed:", e);
     } finally {
-      if (currentId === lampaFetchId.current) {
-        setLampaLoading(false);
-      }
+      setLampaLoading(false);
     }
-  }, [id, mediaType, season, episode]);
+  }, [id, mediaType, russianEmbedUrl]);
 
   useEffect(() => {
     doHdrezkaSearch();
@@ -230,13 +208,6 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       })));
     }).catch(() => {});
   }, [id, mediaType, season, episode]);
-
-  // Russian Dub is served via iframe embed (vidsrc.cc with defaultLanguage=ru).
-  const russianEmbedUrl =
-    mediaType === "tv"
-      ? `https://vidsrc.cc/v2/embed/tv/${id}/${season ?? 1}/${episode ?? 1}?autoPlay=true&defaultLanguage=ru`
-      : `https://vidsrc.cc/v2/embed/movie/${id}?autoPlay=true&defaultLanguage=ru`;
-
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
