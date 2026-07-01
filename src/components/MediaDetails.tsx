@@ -269,7 +269,25 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
+      {/* Russian Dub — opens vidsrc.cc embed in overlay */}
+      <div className="mt-4 flex justify-center">
+        <button
+          onClick={() => setShowRussianEmbed(true)}
+          className="flex items-center gap-2 rounded-lg bg-green-600/20 px-4 py-2 text-sm font-medium text-green-300 ring-1 ring-green-500/30 transition hover:bg-green-600/30 hover:text-green-200"
+        >
+          <Languages className="h-4 w-4" /> Open Russian Dub
+        </button>
+      </div>
+
+      {showRussianEmbed && (
+        <EmbedOverlay
+          src={russianEmbedUrl}
+          title={`${title ?? "Russian Dub"} — Russian`}
+          onClose={() => setShowRussianEmbed(false)}
+        />
+      )}
     </div>
   );
 }
+
 
