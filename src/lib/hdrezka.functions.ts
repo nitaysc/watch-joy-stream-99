@@ -204,7 +204,7 @@ export const getHDRezkaEpisodes = async ({ data }: { data: { videoId: string; tr
     }
   };
 
-export const getHDRezkaStream = async ({ data }: { data: { videoId: string; translatorId: string; season?: number; episode?: number } }): Promise<HdrezkaStream | null> => {
+export const getHDRezkaStream = async ({ data }: { data: { videoId: string; translatorId: string; season?: number; episode?: number; isCamRip?: boolean; isAds?: boolean; isDirector?: boolean } }): Promise<HdrezkaStream | null> => {
     try {
       const baseUrl = await getBaseUrl();
       const form: Record<string, string> = {

@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { RefreshCw, Languages, Loader2 } from "lucide-react";
+import { RefreshCw, Languages, Loader2, Server } from "lucide-react";
 import HlsPlayer, { type ServerSource, type ExternalSubtitle } from "@/components/HlsPlayer";
 import { getStreams } from "@/lib/cinepro.functions";
+import { getLampaStreams } from "@/lib/lampa.functions";
 import { searchSubtitles } from "@/lib/opensubtitles.functions";
 import { searchHDRezka, getHDRezkaVideo, resolveStreamUrl } from "@/lib/hdrezka.functions";
 
@@ -94,6 +95,9 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
   const hdrezkaFetchId = useRef(0);
   const [hdrezkaRetry, setHdrezkaRetry] = useState(0);
 
+  const [lampaLoading, setLampaLoading] = useState(false);
+  const lampaFetchId = useRef(0);
+
   const applySources = (sorted: Source[]) => {
     // Icefy is most reliable
     const icefyIdx = sorted.findIndex((s) => s.provider?.name === "Icefy");
@@ -115,7 +119,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     if (mapped.length > 0) {
       setActiveIdx(0);
       setStreamUrl(mapped[0].url);
-      setStreamType(mapped[0].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+      setStreamType(mapped[0].type === "mp4" ? "video/mp4" : mapped[0].type === "iframe" ? "iframe" : "application/x-mpegURL");
     }
   };
 
@@ -258,7 +262,7 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
             provider: { name: `HDRezka — ${translation.name}` },
           };
 
-          pushLog(`HDRezka: SUCCESS! Added ${hdSource.provider.name}`);
+          pushLog(`HDRezka: SUCCESS! Added ${hdSource.provider?.name}`);
           
           setSources((prev) => {
             const existsIdx = prev.findIndex((s) => s.provider?.name === hdSource.provider?.name);
@@ -280,15 +284,54 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
     }
   }, [title, season, episode]);
 
+  const doLampaSearch = useCallback(async () => {
+    if (!id || !mediaType) return;
+    setLampaLoading(true);
+    const currentId = ++lampaFetchId.current;
+    
+    try {
+      const res = await getLampaStreams({
+        data: {
+          id,
+          mediaType,
+          season,
+          episode,
+        }
+      });
+      
+      if (currentId !== lampaFetchId.current) return;
+      
+      if (res && res.sources && res.sources.length > 0) {
+        setSources((prev) => {
+          const newSources = [...prev];
+          for (const s of res.sources) {
+            if (!newSources.some(x => x.url === s.url)) {
+              newSources.push(s);
+            }
+          }
+          return newSources;
+        });
+      }
+    } catch (e: any) {
+      console.error("Lampa fetch failed:", e);
+      setDebugLogs(prev => [...prev, `Lampa ERROR: ${e.message}`]);
+    } finally {
+      if (currentId === lampaFetchId.current) {
+        setLampaLoading(false);
+      }
+    }
+  }, [id, mediaType, season, episode]);
+
   useEffect(() => {
     doHdrezkaSearch();
-  }, [doHdrezkaSearch]);
+    doLampaSearch();
+  }, [doHdrezkaSearch, doLampaSearch]);
 
   const handleSourceChange = (idx: number) => {
     if (idx < 0 || idx >= sources.length) return;
     setActiveIdx(idx);
     setStreamUrl(sources[idx].url);
-    setStreamType(sources[idx].type === "mp4" ? "video/mp4" : "application/x-mpegURL");
+    setStreamType(sources[idx].type === "mp4" ? "video/mp4" : sources[idx].type === "iframe" ? "iframe" : "application/x-mpegURL");
   };
 
   const handlePlaybackError = () => {
@@ -334,21 +377,25 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
       <div className="overflow-hidden rounded-2xl bg-black ring-1 ring-white/10 shadow-2xl shadow-black/50 transition-all duration-500">
         {streamUrl ? (
           <div className="aspect-video w-full">
-            <HlsPlayer
-              key={`${mediaType}-${id}`}
-              src={streamUrl}
-              type={streamType}
-              poster={poster}
-              autoplay
-              sources={sources}
-              activeSourceIdx={activeIdx}
-              onSourceChange={handleSourceChange}
-              onError={handlePlaybackError}
-              episodeInfo={episodeInfo}
-              onPrevEpisode={onPrevEpisode}
-              onNextEpisode={onNextEpisode}
-              externalSubtitles={subtitles}
-            />
+            {streamType === "iframe" ? (
+              <iframe src={streamUrl} className="w-full h-full border-0" allowFullScreen />
+            ) : (
+              <HlsPlayer
+                key={`${mediaType}-${id}`}
+                src={streamUrl}
+                type={streamType}
+                poster={poster}
+                autoplay
+                sources={sources}
+                activeSourceIdx={activeIdx}
+                onSourceChange={handleSourceChange}
+                onError={handlePlaybackError}
+                episodeInfo={episodeInfo}
+                onPrevEpisode={onPrevEpisode}
+                onNextEpisode={onNextEpisode}
+                externalSubtitles={subtitles}
+              />
+            )}
           </div>
         ) : (
           <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-white/[0.02] to-white/[0.01]">
@@ -379,7 +426,44 @@ export default function MediaDetails({ id, mediaType, poster, season, episode, e
         )}
       </div>
 
+      {sources.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-sm font-medium text-white/60 mb-3 px-1">Available Servers</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {sources.map((src, idx) => (
+              <button
+                key={idx}
+                onClick={() => handleSourceChange(idx)}
+                className={`flex flex-col gap-1 items-start px-4 py-3 rounded-xl border text-left transition-all ${
+                  idx === activeIdx
+                    ? "border-purple-500/50 bg-purple-500/10 text-purple-200"
+                    : "border-white/5 bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Server className="w-4 h-4" />
+                  <span className="font-medium text-sm text-white">
+                    {src.provider?.name || `Server ${idx + 1}`}
+                  </span>
+                </div>
+                {src.type !== "iframe" && (
+                  <span className="text-xs font-mono opacity-60">
+                    {src.quality} • {src.type?.split("/")[1]?.toUpperCase() || "HLS"}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {(hdrezkaLoading || lampaLoading) && (
+            <div className="flex items-center gap-2 text-sm text-gray-500 mt-4">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Searching external providers...</span>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
-}
 
+}
