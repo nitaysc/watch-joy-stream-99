@@ -261,27 +261,48 @@ export const resolveStreamUrl = async ({ data }: { data: { videoId: string; tran
     }
   };
 
-const execFileAsync = promisify(execFile);
-
 export async function extractHDRezkaStreams(url: string, season?: number, episode?: number, translatorId?: string) {
   try {
-    const scraperPath = path.join(process.cwd(), 'src', 'lib', 'python', 'scraper.py');
-    const args = [scraperPath, url];
-    if (season !== undefined && episode !== undefined) {
-      args.push(season.toString(), episode.toString());
-    }
-    if (translatorId !== undefined) {
-      if (args.length === 2) args.push('null', 'null');
-      args.push(translatorId.toString());
+    const video = await getHDRezkaVideo({ data: { url } });
+    if (!video) {
+        console.log("HDRezka Node: getHDRezkaVideo returned null");
+        return null;
     }
 
-    const pythonCmd = process.platform === 'win32' ? 'py' : 'python3';
-    const { stdout } = await execFileAsync(pythonCmd, args);
-    const result = JSON.parse(stdout);
-    if (!result.success) throw new Error(result.error);
-    return result.videos;
+    let targetTranslatorId = translatorId || video.translations[0]?.id || "";
+    if (!translatorId) {
+        const defaultTrans = video.translations.find(t => t.isDefault);
+        if (defaultTrans) targetTranslatorId = defaultTrans.id;
+    }
+
+    console.log("HDRezka Node: Fetching stream for videoId:", video.id, "translatorId:", targetTranslatorId, "season:", season, "episode:", episode);
+
+    const stream = await getHDRezkaStream({
+      data: {
+        videoId: video.id,
+        translatorId: targetTranslatorId,
+        season,
+        episode,
+      }
+    });
+
+    if (!stream) {
+        console.log("HDRezka Node: getHDRezkaStream returned null");
+        return null;
+    }
+
+    const resultVideos: Record<string, string> = {};
+    for (const [quality, urls] of Object.entries(stream.formats)) {
+      if (urls.mp4) {
+        resultVideos[quality] = urls.mp4;
+      } else if (urls.hls) {
+        resultVideos[quality] = urls.hls;
+      }
+    }
+
+    return Object.keys(resultVideos).length > 0 ? resultVideos : null;
   } catch (error) {
-    console.error("HDRezka Python Scraper Error:", error);
+    console.error("HDRezka Node Scraper Error:", error);
     return null;
   }
 }
